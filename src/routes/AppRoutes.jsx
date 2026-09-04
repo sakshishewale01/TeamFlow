@@ -8,6 +8,7 @@ import { NotFoundPage } from '@/pages/NotFoundPage'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/common/Card'
 import { Clock } from 'lucide-react'
 import { WorkspacesPage } from '@/pages/WorkspacesPage'
+import { ProjectsPage } from '@/pages/ProjectsPage'
 
 // Lightweight placeholder view for navigation items scheduled for subsequent phases
 function FeaturePlaceholder({ title, description, phase }) {
@@ -59,13 +60,7 @@ export function AppRoutes() {
           />
           <Route
             path="projects"
-            element={
-              <FeaturePlaceholder
-                title="Projects"
-                description="Project lists, details, and member assignment"
-                phase="Phase 4 (Project Management)"
-              />
-            }
+            element={<ProjectsPage />}
           />
           <Route
             path="tasks"
