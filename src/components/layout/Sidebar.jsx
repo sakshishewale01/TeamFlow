@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/common/Badge'
+import { useWorkspace } from '@/hooks/useWorkspace'
 
 const navItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -22,7 +23,29 @@ const navItems = [
   { label: 'Settings', path: '/settings', icon: Settings },
 ]
 
+const roleBadgeVariant = {
+  Admin:   'danger',
+  Manager: 'warning',
+  Member:  'primary',
+  Viewer:  'default',
+}
+
+function getInitials(name = '') {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('') || 'WS'
+}
+
 export function Sidebar({ isOpen, onClose }) {
+  const { activeWorkspace } = useWorkspace()
+
+  const displayName   = activeWorkspace?.name ?? 'No Workspace'
+  const displayRole   = activeWorkspace?.role ?? null
+  const displayInitials = getInitials(activeWorkspace?.name ?? '')
+  const badgeVariant  = roleBadgeVariant[displayRole] ?? 'default'
+
   return (
     <>
       {/* Mobile Backdrop */}
@@ -69,26 +92,33 @@ export function Sidebar({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Workspace Switcher Placeholder */}
+        {/* Workspace Switcher */}
         <div className="p-3 border-b border-slate-100 dark:border-slate-800/60">
-          <div className="flex items-center justify-between rounded-lg border border-slate-200/80 bg-slate-50/70 p-2.5 dark:border-slate-800 dark:bg-slate-800/40">
+          <NavLink
+            to="/workspaces"
+            onClick={() => onClose?.()}
+            id="sidebar-workspace-switcher"
+            className="flex items-center justify-between rounded-lg border border-slate-200/80 bg-slate-50/70 p-2.5 hover:bg-slate-100 transition-colors dark:border-slate-800 dark:bg-slate-800/40 dark:hover:bg-slate-800"
+          >
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 font-semibold text-xs">
-                TF
+                {displayInitials}
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
-                  Main Workspace
+                  {displayName}
                 </p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <Badge variant="primary" className="text-[10px] px-1.5 py-0">
-                    Admin
-                  </Badge>
-                </div>
+                {displayRole && (
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Badge variant={badgeVariant} className="text-[10px] px-1.5 py-0">
+                      {displayRole}
+                    </Badge>
+                  </div>
+                )}
               </div>
             </div>
             <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
-          </div>
+          </NavLink>
         </div>
 
         {/* Navigation Items */}
@@ -119,14 +149,14 @@ export function Sidebar({ isOpen, onClose }) {
           })}
         </nav>
 
-        {/* Footer / Foundation status info */}
+        {/* Footer */}
         <div className="p-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
           <div className="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800/50">
             <p className="font-medium text-slate-700 dark:text-slate-300">
-              Foundation Active
+              Phase 4 Active
             </p>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Phase 1 architecture ready
+              Workspace management ready
             </p>
           </div>
         </div>
