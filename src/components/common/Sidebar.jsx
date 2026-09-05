@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
+  Building2,
   FolderKanban,
   CheckSquare,
   Users,
@@ -17,6 +18,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useRole } from '../../hooks/useRole';
 import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
+import WorkspaceSwitcher from './WorkspaceSwitcher';
 import { APP_ROUTES } from '../../utils/constants';
 
 export const Sidebar = ({
@@ -39,10 +41,16 @@ export const Sidebar = ({
       badge: null,
     },
     {
+      label: 'Workspaces',
+      path: APP_ROUTES.WORKSPACES,
+      icon: Building2,
+      badge: null,
+    },
+    {
       label: 'Projects',
-      path: '/app/projects',
+      path: APP_ROUTES.PROJECTS,
       icon: FolderKanban,
-      badge: 'Soon',
+      badge: null,
     },
     {
       label: 'Tasks',
@@ -109,6 +117,9 @@ export const Sidebar = ({
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         </div>
+
+        {/* Workspace Switcher */}
+        <WorkspaceSwitcher isCollapsed={isCollapsed} />
 
         {/* Navigation Links */}
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">

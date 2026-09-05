@@ -1,171 +1,126 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-} from 'react'
-import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/hooks/useAuth'
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { workspaceService } from '../services/workspaceService';
+import { WorkspaceContext } from './workspaceContextDef';
 
-const WorkspaceContext = createContext(null)
+export const WorkspaceProvider = ({ children }) => {
+  const { user, isAuthenticated } = useAuth();
+  const [workspaces, setWorkspaces] = useState([]);
+  const [activeWorkspace, setActiveWorkspaceState] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-export function WorkspaceProvider({ children }) {
-  const { user } = useAuth()
-
-  const [workspaces, setWorkspaces] = useState([])
-  const [activeWorkspace, setActiveWorkspace] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-
-  // Fetch all workspaces where the current user is a member
-  const fetchWorkspaces = useCallback(async () => {
-    if (!user) {
-      setWorkspaces([])
-      setActiveWorkspace(null)
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('workspace_members')
-        .select(`
-          role,
-          workspaces (
-            id,
-            name,
-            description,
-            created_by,
-            created_at
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', {
-          referencedTable: 'workspaces',
-          ascending: false,
-        })
-
-      if (fetchError) {
-        throw fetchError
-      }
-
-      const workspaceList = (data ?? [])
-        .filter((row) => row.workspaces !== null)
-        .map((row) => ({
-          ...row.workspaces,
-          role: row.role,
-        }))
-
-      setWorkspaces(workspaceList)
-
-      // Keep the selected workspace if it still exists.
-      // Otherwise, select the first workspace.
-      setActiveWorkspace((previousWorkspace) => {
-        if (previousWorkspace) {
-          const existingWorkspace = workspaceList.find(
-            (workspace) => workspace.id === previousWorkspace.id
-          )
-
-          return existingWorkspace ?? workspaceList[0] ?? null
-        }
-
-        return workspaceList[0] ?? null
-      })
-    } catch (err) {
-      console.error(
-        '[WorkspaceContext] fetchWorkspaces:',
-        err.message
-      )
-
-      setError(err.message || 'Failed to load workspaces.')
-    } finally {
-      setLoading(false)
-    }
-  }, [user])
-
-  // Fetch workspaces whenever the logged-in user changes
   useEffect(() => {
-    const loadWorkspaces = async () => {
-      await fetchWorkspaces()
+    let ignore = false;
+
+    async function loadWorkspaces() {
+      if (!isAuthenticated || !user?.id) {
+        if (!ignore) {
+          setWorkspaces([]);
+          setActiveWorkspaceState(null);
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        if (!ignore) {
+          setLoading(true);
+          setError(null);
+        }
+        const list = await workspaceService.getWorkspaces(user.id);
+        if (!ignore) {
+          setWorkspaces(list);
+
+          if (list.length > 0) {
+            const savedId = localStorage.getItem('teamflow_active_workspace_id');
+            const matched = list.find((w) => w.id === savedId) || list[0];
+            setActiveWorkspaceState(matched);
+            localStorage.setItem('teamflow_active_workspace_id', matched.id);
+          } else {
+            setActiveWorkspaceState(null);
+            localStorage.removeItem('teamflow_active_workspace_id');
+          }
+        }
+      } catch (err) {
+        if (!ignore) {
+          console.error('[WorkspaceContext] Error fetching workspaces:', err);
+          setError(err.message || 'Failed to load workspaces.');
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
     }
 
-    loadWorkspaces()
-  }, [fetchWorkspaces])
+    loadWorkspaces();
 
-  // Create a new workspace
-  const createWorkspace = useCallback(
-    async ({ name, description = '' }) => {
-      if (!user) {
-        throw new Error(
-          'You must be logged in to create a workspace.'
-        )
-      }
+    return () => {
+      ignore = true;
+    };
+  }, [isAuthenticated, user?.id, refreshTrigger]);
 
-      const trimmedName = name?.trim()
+  const refreshWorkspaces = (selectWorkspaceId = null) => {
+    if (selectWorkspaceId) {
+      localStorage.setItem('teamflow_active_workspace_id', selectWorkspaceId);
+    }
+    setRefreshTrigger((prev) => prev + 1);
+  };
 
-      if (!trimmedName) {
-        throw new Error('Workspace name cannot be empty.')
-      }
+  const switchWorkspace = (workspace) => {
+    if (!workspace) return;
+    setActiveWorkspaceState(workspace);
+    localStorage.setItem('teamflow_active_workspace_id', workspace.id);
+  };
 
-      const trimmedDescription = description?.trim() || null
+  const createWorkspace = async ({ name, description }) => {
+    const newWorkspace = await workspaceService.createWorkspace(user.id, { name, description });
+    refreshWorkspaces(newWorkspace.id);
+    return newWorkspace;
+  };
 
-      const { data, error: insertError } = await supabase
-        .from('workspaces')
-        .insert({
-          name: trimmedName,
-          description: trimmedDescription,
-          created_by: user.id,
-        })
-        .select()
-        .single()
+  const updateWorkspace = async (id, data) => {
+    const updated = await workspaceService.updateWorkspace(id, data);
+    refreshWorkspaces(activeWorkspace?.id === id ? id : null);
+    return updated;
+  };
 
-      if (insertError) {
-        throw insertError
-      }
+  const deleteWorkspace = async (id) => {
+    await workspaceService.deleteWorkspace(id);
+    refreshWorkspaces();
+  };
 
-      // Refresh the workspace list after creation
-      await fetchWorkspaces()
-
-      return data
-    },
-    [user, fetchWorkspaces]
-  )
-
-  // Select an active workspace
-  const selectWorkspace = useCallback((workspace) => {
-    setActiveWorkspace(workspace)
-  }, [])
+  // Role in current active workspace
+  const workspaceRole = activeWorkspace?.userRole || 'member';
+  const isWorkspaceAdmin = workspaceRole === 'admin';
+  const isWorkspaceManager = workspaceRole === 'manager' || isWorkspaceAdmin;
+  const isWorkspaceViewer = workspaceRole === 'viewer';
+  const canManageWorkspace = isWorkspaceAdmin || isWorkspaceManager;
 
   const value = {
     workspaces,
     activeWorkspace,
     loading,
     error,
-    fetchWorkspaces,
+    workspaceRole,
+    isWorkspaceAdmin,
+    isWorkspaceManager,
+    isWorkspaceViewer,
+    canManageWorkspace,
+    switchWorkspace,
     createWorkspace,
-    selectWorkspace,
-  }
+    updateWorkspace,
+    deleteWorkspace,
+    refreshWorkspaces,
+  };
 
   return (
     <WorkspaceContext.Provider value={value}>
       {children}
     </WorkspaceContext.Provider>
-  )
-}
+  );
+};
 
-// eslint-disable-next-line react-refresh/only-export-components
-export function useWorkspace() {
-  const context = useContext(WorkspaceContext)
-
-  if (!context) {
-    throw new Error(
-      'useWorkspace must be used within a WorkspaceProvider'
-    )
-  }
-
-  return context
-}
+export default WorkspaceProvider;

@@ -8,9 +8,11 @@ import {
   LogOut,
   ChevronDown,
   ShieldCheck,
+  Building2,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useRole } from '../../hooks/useRole';
+import { useWorkspace } from '../../hooks/useWorkspace';
 import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
 import ThemeToggle from '../ui/ThemeToggle';
@@ -19,6 +21,7 @@ import { APP_ROUTES } from '../../utils/constants';
 export const Header = ({ onOpenMobileMenu, onLogoutClick }) => {
   const { user, profile } = useAuth();
   const { roleMeta } = useRole();
+  const { activeWorkspace } = useWorkspace();
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -62,8 +65,17 @@ export const Header = ({ onOpenMobileMenu, onLogoutClick }) => {
           </div>
         </div>
 
-        {/* Right Side: Theme Toggle, Notifications, User Menu */}
+        {/* Right Side: Active Workspace, Theme Toggle, Notifications, User Menu */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {activeWorkspace && (
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-xs">
+              <Building2 className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+              <span className="font-semibold text-slate-800 dark:text-slate-200 max-w-[130px] truncate">
+                {activeWorkspace.name}
+              </span>
+            </div>
+          )}
+
           <ThemeToggle />
 
           {/* Notifications button placeholder */}

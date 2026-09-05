@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { FolderKanban, CheckSquare, Users, Settings } from 'lucide-react';
+import { CheckSquare, Users, Settings } from 'lucide-react';
 import AuthLayout from '../layouts/AuthLayout';
 import AppLayout from '../layouts/AppLayout';
 import ProtectedRoute from './ProtectedRoute';
@@ -14,6 +14,9 @@ import ForgotPassword from '../pages/ForgotPassword';
 import ResetPassword from '../pages/ResetPassword';
 import ProfilePage from '../pages/ProfilePage';
 import DashboardPlaceholder from '../pages/DashboardPlaceholder';
+import WorkspacesPage from '../pages/WorkspacesPage';
+import ProjectsPage from '../pages/ProjectsPage';
+import ProjectDetailsPage from '../pages/ProjectDetailsPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import EmptyState from '../components/common/EmptyState';
@@ -64,19 +67,12 @@ export const AppRoutes = () => {
         }
       >
         <Route index element={<DashboardPlaceholder />} />
+        <Route path="workspaces" element={<WorkspacesPage />} />
+        <Route path="projects" element={<ProjectsPage />} />
+        <Route path="projects/:projectId" element={<ProjectDetailsPage />} />
         <Route path="profile" element={<ProfilePage />} />
 
         {/* Future Prompt Placeholders with clean empty states */}
-        <Route
-          path="projects"
-          element={
-            <EmptyState
-              icon={FolderKanban}
-              title="Projects Module"
-              description="Project workspaces and board views will be unlocked in Prompt 2. Foundation is ready."
-            />
-          }
-        />
         <Route
           path="tasks"
           element={

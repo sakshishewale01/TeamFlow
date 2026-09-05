@@ -1,1 +1,12 @@
-export { useWorkspace } from '@/context/WorkspaceContext'
+import { useContext } from 'react';
+import { WorkspaceContext } from '../context/workspaceContextDef';
+
+export const useWorkspace = () => {
+  const context = useContext(WorkspaceContext);
+  if (!context) {
+    throw new Error('useWorkspace must be used within a WorkspaceProvider');
+  }
+  return context;
+};
+
+export default useWorkspace;
