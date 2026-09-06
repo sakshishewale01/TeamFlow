@@ -12,7 +12,7 @@
     <a href="#-architecture--project-structure">Architecture</a> •
     <a href="#-database--schema">Database & RLS</a> •
     <a href="#-getting-started">Getting Started</a> •
-    <a href="#-environment-variables">Environment</a> •
+    <a href="#-environment-variables">Environment</a> 
 
   </p>
 
