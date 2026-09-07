@@ -291,5 +291,5 @@ Contributions make the open-source community an amazing place to learn, inspire,
 ---
 
 <div align="center">
-  <sub>Built with ❤️ using React 19 & Supabase by <a href="https://github.com/sakshishewale01">Sakshi Shewale</a> and contributors.</sub>
+  <sub>Built with ❤️ using React 19 & Supabase by <a href="https://github.com/sakshishewale01">Sakshi Shewale</a> </sub>
 </div>
