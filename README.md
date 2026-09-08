@@ -121,10 +121,6 @@ TeamFlow/
 └── vite.config.js              # Vite bundler configuration
 ```
 
----
-
----
-
 ## 🚦 Getting Started
 
 ### 1. Prerequisites
