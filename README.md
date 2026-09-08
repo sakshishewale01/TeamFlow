@@ -120,7 +120,7 @@ TeamFlow/
 ├── tailwind.config.js          # Tailwind CSS design system tokens
 └── vite.config.js              # Vite bundler configuration
 ```
-
+```
 ## 🚦 Getting Started
 
 ### 1. Prerequisites
