@@ -26,7 +26,6 @@ import { useToast } from '../hooks/useToast';
 import { projectService } from '../services/projectService';
 import {
   PROJECT_STATUS_DETAILS,
-  ROLE_DETAILS,
   APP_ROUTES,
 } from '../utils/constants';
 
@@ -304,10 +303,10 @@ export const ProjectDetailsPage = () => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {project.members?.map((member) => {
-                const roleMeta = ROLE_DETAILS[member.role] || ROLE_DETAILS.member;
+                const isOwner = member.user_id === project.created_by;
                 const name = member.user?.full_name || member.user?.email || 'User';
                 const isCurrentUser = member.user_id === user?.id;
-                const canRemove = canManageProject || isCurrentUser;
+                const canRemove = (canManageProject || isCurrentUser) && !isOwner;
                 return (
                   <div
                     key={member.id}
@@ -323,7 +322,9 @@ export const ProjectDetailsPage = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Badge variant={roleMeta.badgeColor} size="xs">{roleMeta.label}</Badge>
+                      <Badge variant={isOwner ? 'purple' : 'slate'} size="xs">
+                        {isOwner ? 'Lead' : 'Member'}
+                      </Badge>
                       {canRemove && (
                         <button
                           type="button"

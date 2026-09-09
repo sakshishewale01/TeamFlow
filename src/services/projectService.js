@@ -12,7 +12,7 @@ export const projectService = {
         members:project_members(
           id,
           user_id,
-          role,
+          added_at,
           user:profiles!fk_project_members_profile(id, full_name, email, avatar_url)
         )
       `)
@@ -53,8 +53,7 @@ export const projectService = {
           id,
           project_id,
           user_id,
-          role,
-          created_at,
+          added_at,
           user:profiles!fk_project_members_profile(id, full_name, email, avatar_url)
         )
       `)
@@ -168,12 +167,11 @@ export const projectService = {
         id,
         project_id,
         user_id,
-        role,
-        created_at,
+        added_at,
         user:profiles!fk_project_members_profile(id, full_name, email, avatar_url)
       `)
       .eq('project_id', projectId)
-      .order('created_at', { ascending: true });
+      .order('added_at', { ascending: true });
 
     if (error) {
       console.error('Error fetching project members:', error);
@@ -183,7 +181,7 @@ export const projectService = {
     return data || [];
   },
 
-  async addProjectMember(projectId, userId, role = 'member') {
+  async addProjectMember(projectId, userId) {
     if (!isSupabaseConfigured || !projectId || !userId) {
       throw new Error('Project ID and User ID are required.');
     }
@@ -193,14 +191,12 @@ export const projectService = {
       .insert({
         project_id: projectId,
         user_id: userId,
-        role,
       })
       .select(`
         id,
         project_id,
         user_id,
-        role,
-        created_at,
+        added_at,
         user:profiles!fk_project_members_profile(id, full_name, email, avatar_url)
       `)
       .single();

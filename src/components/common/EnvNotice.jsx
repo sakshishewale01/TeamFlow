@@ -58,7 +58,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOi...`;
               </div>
             </li>
             <li>
-              Execute the migration in <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded font-mono">supabase/migrations/20260905000001_create_profiles_and_roles.sql</code> inside the Supabase <strong>SQL Editor</strong>.
+              Execute the canonical migration in <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded font-mono">supabase/migrations/001_initial_schema.sql</code> inside the Supabase <strong>SQL Editor</strong>.
             </li>
           </ol>
         </div>

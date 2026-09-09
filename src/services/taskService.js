@@ -1,7 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const TASK_SELECT = `
-  id, project_id, workspace_id, title, description,
+  id, project_id, title, description,
   status, priority, position, due_date, created_at, updated_at,
   assignee_id,
   assignee:profiles!tasks_assignee_id_fkey(id, full_name, email, avatar_url),
@@ -52,7 +52,6 @@ export const taskService = {
       .from('tasks')
       .insert({
         project_id: projectId,
-        workspace_id: workspaceId,
         created_by: userId,
         title: title.trim(),
         description: description?.trim() || null,

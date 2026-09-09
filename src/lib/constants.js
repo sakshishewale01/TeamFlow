@@ -1,13 +1,13 @@
 /**
- * TeamFlow Core Domain Constants
+ * TeamFlow Core Domain Constants (Aligned with Canonical PostgreSQL Schema)
  */
 
-// User Workspace Roles
+// Canonical Workspace Roles
 export const ROLES = {
-  ADMIN: 'Admin',
-  MANAGER: 'Manager',
-  MEMBER: 'Member',
-  VIEWER: 'Viewer',
+  ADMIN: 'admin',
+  MANAGER: 'manager',
+  MEMBER: 'member',
+  VIEWER: 'viewer',
 }
 
 // Role Descriptions for display & onboarding
@@ -18,24 +18,22 @@ export const ROLE_DESCRIPTIONS = {
   [ROLES.VIEWER]: 'Read-only access to workspace projects and tasks',
 }
 
-// Task Statuses
+// Canonical Task Statuses
 export const TASK_STATUS = {
-  BACKLOG: 'backlog',
   TODO: 'todo',
   IN_PROGRESS: 'in_progress',
-  IN_REVIEW: 'in_review',
+  REVIEW: 'review',
   DONE: 'done',
 }
 
 export const TASK_STATUS_LABELS = {
-  [TASK_STATUS.BACKLOG]: 'Backlog',
   [TASK_STATUS.TODO]: 'To Do',
   [TASK_STATUS.IN_PROGRESS]: 'In Progress',
-  [TASK_STATUS.IN_REVIEW]: 'In Review',
+  [TASK_STATUS.REVIEW]: 'In Review',
   [TASK_STATUS.DONE]: 'Done',
 }
 
-// Task Priorities
+// Canonical Task Priorities
 export const TASK_PRIORITY = {
   LOW: 'low',
   MEDIUM: 'medium',

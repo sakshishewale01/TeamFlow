@@ -7,7 +7,7 @@ import Spinner from '../ui/Spinner';
 import { workspaceService } from '../../services/workspaceService';
 import { projectService } from '../../services/projectService';
 import { useToast } from '../../hooks/useToast';
-import { ROLES, ROLE_DETAILS } from '../../utils/constants';
+import { ROLE_DETAILS } from '../../utils/constants';
 
 export const AddProjectMemberModal = ({
   isOpen,
@@ -19,7 +19,6 @@ export const AddProjectMemberModal = ({
 }) => {
   const [workspaceMembers, setWorkspaceMembers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState('');
-  const [selectedRole, setSelectedRole] = useState(ROLES.MEMBER);
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -72,7 +71,7 @@ export const AddProjectMemberModal = ({
     setError(null);
 
     try {
-      const added = await projectService.addProjectMember(projectId, selectedUserId, selectedRole);
+      const added = await projectService.addProjectMember(projectId, selectedUserId);
       toast.success('Member assigned to project.', 'Member Added');
       if (onMemberAdded) onMemberAdded(added);
       onClose();
@@ -89,7 +88,7 @@ export const AddProjectMemberModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Add Project Member"
-      description="Only existing workspace members can be added to this project."
+      description="Assign workspace teammates to this project."
       size="md"
     >
       {loading ? (
@@ -155,34 +154,9 @@ export const AddProjectMemberModal = ({
                       </div>
                     </div>
                     <Badge variant={roleMeta.badgeColor} size="xs">
-                      Workspace: {roleMeta.label}
+                      {roleMeta.label}
                     </Badge>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
-              Project Role
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {Object.entries(ROLE_DETAILS).map(([roleKey, item]) => {
-                const isSelected = selectedRole === roleKey;
-                return (
-                  <button
-                    key={roleKey}
-                    type="button"
-                    onClick={() => setSelectedRole(roleKey)}
-                    className={`p-2 rounded-xl text-xs font-semibold border transition text-center ${
-                      isSelected
-                        ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300'
-                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
                 );
               })}
             </div>
