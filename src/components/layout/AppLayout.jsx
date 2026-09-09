@@ -23,7 +23,7 @@ export function AppLayout() {
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
               <span>
-                <strong>Setup Notice:</strong> Supabase backend is running in mock/demo mode. Connect your hosted Supabase project in <code>.env.local</code> when ready.
+                <strong>Setup Notice:</strong> Supabase backend is running in initial setup mode. Set real credentials in <code>.env.local</code> when ready for live database sync.
               </span>
             </div>
             <span className="hidden sm:inline-block font-mono text-[11px] bg-amber-500/15 px-2 py-0.5 rounded">
@@ -42,3 +42,5 @@ export function AppLayout() {
     </div>
   )
 }
+
+export default AppLayout
