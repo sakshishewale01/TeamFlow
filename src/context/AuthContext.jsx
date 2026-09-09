@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { authService } from '../services/authService';
 import { profileService } from '../services/profileService';
-import { ROLES } from '../utils/constants';
 import { AuthContext } from './authContextDef';
 
 export const AuthProvider = ({ children }) => {
@@ -20,7 +19,7 @@ export const AuthProvider = ({ children }) => {
     try {
       let data = await profileService.getProfile(userId);
       if (!data) {
-        // If trigger has a slight delay or didn't exist yet, fallback create
+        // Fallback create if database trigger has slight delay or was missing
         data = await profileService.createProfileIfMissing(userId, userEmail, userMetaName);
       }
       setProfile(data);
@@ -94,17 +93,18 @@ export const AuthProvider = ({ children }) => {
     };
   }, [fetchUserProfile]);
 
-  const login = async (email, password) => {
+  // Auth Operations
+  const signIn = async ({ email, password }) => {
     const data = await authService.signIn({ email, password });
     return data;
   };
 
-  const signup = async (email, password, fullName) => {
+  const signUp = async ({ email, password, fullName }) => {
     const data = await authService.signUp({ email, password, fullName });
     return data;
   };
 
-  const logout = async () => {
+  const signOut = async () => {
     await authService.signOut();
     setSession(null);
     setUser(null);
@@ -119,30 +119,32 @@ export const AuthProvider = ({ children }) => {
     return await authService.updatePassword(newPassword);
   };
 
-  // Role utilities
-  const role = profile?.role || ROLES.MEMBER;
-  const isAdmin = role === ROLES.ADMIN;
-  const isManager = role === ROLES.MANAGER || isAdmin;
-  const isMember = role === ROLES.MEMBER || isManager;
-  const isViewer = role === ROLES.VIEWER;
-
-  const hasRole = (allowedRoles) => {
-    if (!allowedRoles || allowedRoles.length === 0) return true;
-    return allowedRoles.includes(role);
+  // Aliases for flexible call patterns (e.g. login(email, password) vs signIn({ email, password }))
+  const login = async (emailOrObj, maybePassword) => {
+    if (typeof emailOrObj === 'object' && emailOrObj !== null) {
+      return await signIn(emailOrObj);
+    }
+    return await signIn({ email: emailOrObj, password: maybePassword });
   };
+
+  const signup = async (emailOrObj, maybePassword, maybeFullName) => {
+    if (typeof emailOrObj === 'object' && emailOrObj !== null) {
+      return await signUp(emailOrObj);
+    }
+    return await signUp({ email: emailOrObj, password: maybePassword, fullName: maybeFullName });
+  };
+
+  const logout = signOut;
 
   const value = {
     session,
     user,
     profile,
-    role,
     loading,
     isAuthenticated: Boolean(session && user),
-    isAdmin,
-    isManager,
-    isMember,
-    isViewer,
-    hasRole,
+    signIn,
+    signUp,
+    signOut,
     login,
     signup,
     logout,

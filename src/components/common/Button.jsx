@@ -20,13 +20,16 @@ export function Button({
   size = 'md',
   isLoading = false,
   disabled = false,
+  fullWidth = false,
   leftIcon = null,
   rightIcon = null,
+  icon: Icon = null,
   className = '',
   type = 'button',
   ...props
 }) {
   const isDisabled = disabled || isLoading
+  const resolvedLeftIcon = leftIcon || (Icon ? (typeof Icon === 'function' || typeof Icon === 'object' ? <Icon className="w-4 h-4" /> : Icon) : null)
 
   return (
     <button
@@ -36,6 +39,7 @@ export function Button({
         'inline-flex items-center justify-center font-medium transition-colors cursor-pointer select-none',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
         'disabled:opacity-60 disabled:cursor-not-allowed disabled:pointer-events-none',
+        fullWidth && 'w-full',
         variants[variant] || variants.primary,
         sizes[size] || sizes.md,
         className
@@ -64,10 +68,12 @@ export function Button({
           />
         </svg>
       ) : (
-        leftIcon
+        resolvedLeftIcon
       )}
       <span>{children}</span>
       {!isLoading && rightIcon}
     </button>
   )
 }
+
+export default Button

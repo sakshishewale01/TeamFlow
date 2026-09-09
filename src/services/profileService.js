@@ -90,9 +90,7 @@ export const profileService = {
       .upsert(
         {
           id: userId,
-          email: userEmail,
           full_name: fullName,
-          role: 'member',
         },
         { onConflict: 'id' }
       )

@@ -10,25 +10,25 @@ export const ROLE_DETAILS = {
     label: 'Admin',
     color: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-300 dark:border-purple-800',
     badgeColor: 'purple',
-    description: 'Full access to workspaces, team settings, and billing',
+    description: 'Full access to workspaces, team settings, and administration',
   },
   [ROLES.MANAGER]: {
     label: 'Manager',
     color: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800',
     badgeColor: 'blue',
-    description: 'Can manage projects, tasks, and team members',
+    description: 'Can manage projects, tasks, and project team members',
   },
   [ROLES.MEMBER]: {
     label: 'Member',
     color: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800',
     badgeColor: 'emerald',
-    description: 'Can create and edit tasks, comments, and project items',
+    description: 'Can create and edit assigned tasks, comments, and items',
   },
   [ROLES.VIEWER]: {
     label: 'Viewer',
     color: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800',
     badgeColor: 'amber',
-    description: 'Read-only access to workspaces and project boards',
+    description: 'Read-only access to workspaces, projects, and boards',
   },
 };
 
@@ -68,30 +68,25 @@ export const APP_ROUTES = {
   SIGNUP: '/signup',
   FORGOT_PASSWORD: '/forgot-password',
   RESET_PASSWORD: '/reset-password',
-  APP: '/app',
-  WORKSPACES: '/app/workspaces',
-  PROJECTS: '/app/projects',
-  PROJECT_DETAILS: '/app/projects/:projectId',
-  PROFILE: '/app/profile',
+  DASHBOARD: '/dashboard',
+  PROJECTS: '/projects',
+  PROJECT_DETAILS: '/projects/:projectId',
+  TASKS: '/tasks',
+  PROFILE: '/profile',
   UNAUTHORIZED: '/unauthorized',
+  // Backward compatibility aliases
+  APP: '/dashboard',
+  WORKSPACES: '/projects',
 };
 
 export const TASK_STATUS = {
-  BACKLOG: 'backlog',
   TODO: 'todo',
   IN_PROGRESS: 'in_progress',
-  IN_REVIEW: 'in_review',
+  REVIEW: 'review',
   DONE: 'done',
 };
 
 export const TASK_STATUS_DETAILS = {
-  [TASK_STATUS.BACKLOG]: {
-    label: 'Backlog',
-    badgeColor: 'slate',
-    columnColor: 'border-t-slate-400',
-    headerBg: 'bg-slate-100 dark:bg-slate-800',
-    dotColor: 'bg-slate-400',
-  },
   [TASK_STATUS.TODO]: {
     label: 'To Do',
     badgeColor: 'blue',
@@ -106,8 +101,8 @@ export const TASK_STATUS_DETAILS = {
     headerBg: 'bg-amber-50 dark:bg-amber-950/40',
     dotColor: 'bg-amber-500',
   },
-  [TASK_STATUS.IN_REVIEW]: {
-    label: 'In Review',
+  [TASK_STATUS.REVIEW]: {
+    label: 'Review',
     badgeColor: 'purple',
     columnColor: 'border-t-purple-500',
     headerBg: 'bg-purple-50 dark:bg-purple-950/40',
