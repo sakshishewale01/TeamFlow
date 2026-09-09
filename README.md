@@ -120,74 +120,6 @@ TeamFlow/
 ├── tailwind.config.js          # Tailwind CSS design system tokens
 └── vite.config.js              # Vite bundler configuration
 ```
-
----
-
-## 🗄 Database & Schema
-
-TeamFlow uses PostgreSQL hosted on Supabase. Relational integrity is enforced using foreign keys and cascading rules.
-
-```mermaid
-erDiagram
-    PROFILES ||--o{ WORKSPACE_MEMBERS : "belongs to"
-    WORKSPACES ||--o{ WORKSPACE_MEMBERS : "has"
-    WORKSPACES ||--o{ PROJECTS : "contains"
-    PROJECTS ||--o{ PROJECT_MEMBERS : "has"
-    PROFILES ||--o{ PROJECT_MEMBERS : "assigned"
-    PROJECTS ||--o{ TASKS : "tracks"
-    WORKSPACES ||--o{ TASKS : "scopes"
-    PROFILES ||--o{ TASKS : "creates / assigned"
-    TASKS ||--o{ COMMENTS : "contains"
-    PROFILES ||--o{ COMMENTS : "authors"
-
-    PROFILES {
-        uuid id PK
-        text email
-        text full_name
-        text avatar_url
-        text role
-    }
-    WORKSPACES {
-        uuid id PK
-        text name
-        text slug
-        uuid owner_id FK
-    }
-    PROJECTS {
-        uuid id PK
-        uuid workspace_id FK
-        text name
-        text description
-        text status
-        text priority
-        date due_date
-    }
-    TASKS {
-        uuid id PK
-        uuid project_id FK
-        uuid workspace_id FK
-        text title
-        text status
-        text priority
-        int position
-        uuid assignee_id FK
-        date due_date
-    }
-    COMMENTS {
-        uuid id PK
-        uuid task_id FK
-        uuid user_id FK
-        text content
-    }
-```
-
-### Row Level Security (RLS)
-- **Data Isolation**: Workspaces, projects, tasks, and comments enforce RLS.
-- **Membership Checks**: Helper SQL functions (e.g. `is_workspace_member()`, `get_workspace_role()`) prevent cross-workspace data leakage.
-- **Triggers**: Automated timestamp management (`handle_updated_at()`) on updates.
-
----
-
 ## 🚦 Getting Started
 
 ### 1. Prerequisites
@@ -293,3 +225,4 @@ Contributions make the open-source community an amazing place to learn, inspire,
 <div align="center">
   <sub>Built with ❤️ using React 19 & Supabase by <a href="https://github.com/sakshishewale01">Sakshi Shewale</a> </sub>
 </div>
+
