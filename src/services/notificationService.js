@@ -79,24 +79,46 @@ export const notificationService = {
       return null;
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: userId,
-          type,
-          message: message.trim(),
-          is_read: false,
-        })
-        .select('id, user_id, type, message, is_read, created_at')
-        .single();
+    const cleanMessage = message.trim();
+    if (!cleanMessage) return null;
 
-      if (error) {
-        console.error('[notificationService] createNotification error:', error);
-        return null;
+    try {
+      // First attempt the secure server-controlled RPC
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        'create_system_notification',
+        {
+          p_user_id: userId,
+          p_type: type,
+          p_message: cleanMessage,
+        }
+      );
+
+      if (!rpcError) {
+        return { id: rpcData, user_id: userId, type, message: cleanMessage, is_read: false };
       }
 
-      return data;
+      // If the RPC is not yet installed in the active DB, fall back to direct insert
+      if (rpcError.message?.includes('function') || rpcError.code === '42883') {
+        const { data, error } = await supabase
+          .from('notifications')
+          .insert({
+            user_id: userId,
+            type,
+            message: cleanMessage,
+            is_read: false,
+          })
+          .select('id, user_id, type, message, is_read, created_at')
+          .single();
+
+        if (error) {
+          console.error('[notificationService] createNotification fallback error:', error);
+          return null;
+        }
+        return data;
+      }
+
+      console.error('[notificationService] create_system_notification RPC error:', rpcError);
+      return null;
     } catch (err) {
       console.error('[notificationService] createNotification unexpected error:', err);
       return null;
