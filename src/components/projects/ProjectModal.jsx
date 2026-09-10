@@ -21,10 +21,18 @@ const ProjectModalForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
     const newErrors = {};
 
-    if (!name.trim()) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       newErrors.name = 'Project name is required';
+    } else if (trimmedName.length > 100) {
+      newErrors.name = 'Project name must be 100 characters or fewer';
+    }
+
+    if (description && description.trim().length > 500) {
+      newErrors.description = 'Description must be 500 characters or fewer';
     }
 
     if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
@@ -41,8 +49,8 @@ const ProjectModalForm = ({
 
     try {
       await onSubmit({
-        name: name.trim(),
-        description: description.trim() || null,
+        name: trimmedName,
+        description: description ? description.trim() : null,
         status,
         startDate: startDate || null,
         endDate: endDate || null,

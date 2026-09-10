@@ -10,6 +10,8 @@ import {
   ArrowLeft,
   Clock,
   UserX,
+  CheckSquare,
+  Sparkles,
 } from 'lucide-react';
 import Card, { CardHeader, CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -19,7 +21,6 @@ import Spinner from '../components/ui/Spinner';
 import Modal from '../components/ui/Modal';
 import ProjectModal from '../components/projects/ProjectModal';
 import AddProjectMemberModal from '../components/projects/AddProjectMemberModal';
-import KanbanBoard from '../components/tasks/KanbanBoard';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -63,7 +64,7 @@ export const ProjectDetailsPage = () => {
         }
       } catch (err) {
         if (!ignore) {
-          console.error('Error loading project details:', err);
+          console.error('[ProjectDetailsPage] Error loading project:', err);
           setError(err.message || 'Failed to load project details.');
         }
       } finally {
@@ -81,9 +82,11 @@ export const ProjectDetailsPage = () => {
 
   const fetchProjectDetails = () => setRefreshTrigger((prev) => prev + 1);
 
-  const canManageProject =
-    !isWorkspaceViewer &&
-    (isWorkspaceAdmin || isWorkspaceManager || project?.created_by === user?.id);
+  // Authorization matching canonical RLS
+  const isCreator = project?.created_by === user?.id;
+  const canManageProject = !isWorkspaceViewer && (isWorkspaceAdmin || isWorkspaceManager || isCreator);
+  const canDeleteProject = isWorkspaceAdmin; // RLS: Only Admins can delete projects
+  const canAddMembers = !isWorkspaceViewer && (isWorkspaceAdmin || isWorkspaceManager);
 
   const handleEditSubmit = async (data) => {
     try {
@@ -152,6 +155,7 @@ export const ProjectDetailsPage = () => {
 
   const statusMeta = PROJECT_STATUS_DETAILS[project.status] || PROJECT_STATUS_DETAILS.planning;
   const existingMemberIds = (project.members || []).map((m) => m.user_id);
+  const creatorName = project.creator?.full_name || project.creator?.email || 'Lead';
 
   const formattedStartDate = project.start_date
     ? new Date(project.start_date).toLocaleDateString('en-US', {
@@ -169,6 +173,14 @@ export const ProjectDetailsPage = () => {
       })
     : 'Ongoing';
 
+  const formattedCreatedDate = project.created_at
+    ? new Date(project.created_at).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : 'N/A';
+
   return (
     <div className="space-y-8 animate-fadeIn">
       {/* Breadcrumb Navigation */}
@@ -184,7 +196,7 @@ export const ProjectDetailsPage = () => {
       <Card className="p-6 sm:p-8">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-indigo-600/20">
+            <div className="w-12 h-12 rounded-2xl bg-linear-to-tr from-indigo-600 to-violet-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-indigo-600/20">
               <FolderKanban className="w-6 h-6" />
             </div>
 
@@ -204,8 +216,8 @@ export const ProjectDetailsPage = () => {
           </div>
 
           {/* Action Buttons */}
-          {canManageProject && (
-            <div className="flex items-center gap-2 shrink-0 self-start lg:self-center">
+          <div className="flex items-center gap-2 shrink-0 self-start lg:self-center">
+            {canManageProject && (
               <Button
                 variant="outline"
                 size="sm"
@@ -214,6 +226,8 @@ export const ProjectDetailsPage = () => {
               >
                 Edit Project
               </Button>
+            )}
+            {canDeleteProject && (
               <Button
                 variant="dangerOutline"
                 size="sm"
@@ -222,8 +236,8 @@ export const ProjectDetailsPage = () => {
               >
                 Delete
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Milestone Dates & Meta Strip */}
@@ -255,20 +269,20 @@ export const ProjectDetailsPage = () => {
             <div className="flex items-center gap-2 font-medium text-slate-800 dark:text-slate-200 truncate">
               <Avatar
                 src={project.creator?.avatar_url}
-                name={project.creator?.full_name || project.creator?.email || 'User'}
+                name={creatorName}
                 size="xs"
               />
-              <span className="truncate">{project.creator?.full_name || 'Project Lead'}</span>
+              <span className="truncate">{creatorName}</span>
             </div>
           </div>
 
           <div>
             <span className="text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider text-[10px] block mb-1">
-              Assigned Teammates
+              Created Date
             </span>
             <div className="flex items-center gap-1.5 font-medium text-slate-800 dark:text-slate-200">
-              <Users className="w-3.5 h-3.5 text-slate-400" />
-              <span>{project.memberCount} member{project.memberCount === 1 ? '' : 's'}</span>
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <span>{formattedCreatedDate}</span>
             </div>
           </div>
         </div>
@@ -283,10 +297,10 @@ export const ProjectDetailsPage = () => {
               <span>Project Team</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Assigned members from {project.workspace?.name || 'Workspace'}
+              Assigned members from {project.workspace?.name || 'Workspace'} ({project.members?.length || 0})
             </p>
           </div>
-          {canManageProject && (
+          {canAddMembers && (
             <Button
               variant="outline"
               size="xs"
@@ -306,7 +320,9 @@ export const ProjectDetailsPage = () => {
                 const isOwner = member.user_id === project.created_by;
                 const name = member.user?.full_name || member.user?.email || 'User';
                 const isCurrentUser = member.user_id === user?.id;
+                // Owner cannot be removed; managers/admins can remove other members; members can remove themselves (leave)
                 const canRemove = (canManageProject || isCurrentUser) && !isOwner;
+
                 return (
                   <div
                     key={member.id}
@@ -316,12 +332,12 @@ export const ProjectDetailsPage = () => {
                       <Avatar src={member.user?.avatar_url} name={name} size="sm" />
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                          {name} {isCurrentUser && <span className="text-[10px] text-indigo-500">(You)</span>}
+                          {name} {isCurrentUser && <span className="text-[10px] text-indigo-500 font-normal">(You)</span>}
                         </p>
                         <p className="text-[10px] text-slate-400 truncate">{member.user?.email}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <Badge variant={isOwner ? 'purple' : 'slate'} size="xs">
                         {isOwner ? 'Lead' : 'Member'}
                       </Badge>
@@ -329,7 +345,7 @@ export const ProjectDetailsPage = () => {
                         <button
                           type="button"
                           onClick={() => setMemberToRemove(member)}
-                          className="p-1 rounded-lg text-slate-300 hover:text-rose-600 dark:text-slate-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition opacity-0 group-hover:opacity-100"
+                          className="p-1 rounded-lg text-slate-300 hover:text-rose-600 dark:text-slate-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition opacity-0 group-hover:opacity-100 cursor-pointer"
                           title={isCurrentUser ? 'Leave Project' : 'Remove from Project'}
                         >
                           <UserX className="w-3.5 h-3.5" />
@@ -344,12 +360,24 @@ export const ProjectDetailsPage = () => {
         </CardContent>
       </Card>
 
-      {/* Kanban Board */}
-      <KanbanBoard
-        projectId={projectId}
-        workspaceId={project.workspace_id}
-        projectMembers={project.members || []}
-      />
+      {/* Planned Future Section: Tasks & Milestones */}
+      <Card className="border-dashed border-2 border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20">
+        <CardContent className="p-8 sm:p-12 text-center">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-4 shadow-xs">
+            <CheckSquare className="w-6 h-6" />
+          </div>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 text-xs font-semibold mb-2">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Coming in Phase 4</span>
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+            Tasks will appear here
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+            Task tracking, Kanban boards, and sprint milestones for &ldquo;{project.name}&rdquo; will be connected in the upcoming Tasks phase.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Edit Project Modal */}
       <ProjectModal
@@ -365,7 +393,7 @@ export const ProjectDetailsPage = () => {
         isOpen={showDeleteModal}
         onClose={() => !isDeleting && setShowDeleteModal(false)}
         title="Delete Project"
-        description={`Are you sure you want to delete "${project.name}"? This action cannot be undone.`}
+        description={`Are you sure you want to delete "${project.name}"? All project milestones and member assignments will be permanently deleted. This action cannot be undone.`}
         size="sm"
       >
         <div className="flex items-center justify-end gap-3 mt-6">
