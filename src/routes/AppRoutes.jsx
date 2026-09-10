@@ -3,9 +3,12 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import AuthLayout from '@/layouts/AuthLayout'
 import { ProtectedRoute } from './ProtectedRoute'
 import { PublicOnlyRoute } from './PublicOnlyRoute'
+import { useAuth } from '@/hooks/useAuth'
+import { Spinner } from '@/components/common/Spinner'
+import { APP_ROUTES } from '@/utils/constants'
 
 // Pages
-import { HomePage } from '@/pages/HomePage'
+import { LandingPage } from '@/pages/LandingPage'
 import {
   LoginPage,
   SignupPage,
@@ -19,11 +22,29 @@ import { TasksPage } from '@/pages/TasksPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
+function RootRoute() {
+  const { isAuthenticated, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+        <Spinner size="lg" />
+      </div>
+    )
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to={APP_ROUTES.DASHBOARD} replace />
+  }
+
+  return <LandingPage />
+}
+
 export function AppRoutes() {
   return (
     <Routes>
-      {/* Public Landing Page */}
-      <Route path="/" element={<HomePage />} />
+      {/* SaaS Entry / Public Landing Route */}
+      <Route path="/" element={<RootRoute />} />
 
       {/* Public-Only Auth Flow */}
       <Route element={<AuthLayout />}>

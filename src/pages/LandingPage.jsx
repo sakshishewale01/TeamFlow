@@ -36,7 +36,7 @@ export const LandingPage = () => {
             {/* Announcement Pill */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/60 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-xs font-semibold mb-8 animate-fade-in shadow-xs">
               <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-              <span>TeamFlow 1.0 Foundation is Ready</span>
+              <span>TeamFlow 1.0 Production Suite</span>
               <span className="w-1 h-1 rounded-full bg-indigo-400" />
               <span className="text-indigo-600 dark:text-indigo-400 font-bold">Supabase RLS Enabled</span>
             </div>
@@ -106,7 +106,7 @@ export const LandingPage = () => {
                       <span className="w-3 h-3 rounded-full bg-emerald-500/80 inline-block" />
                     </div>
                     <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 ml-2">
-                      TeamFlow Workspace &bull; Sprint 1 Foundation
+                      TeamFlow Workspace &bull; Production Suite
                     </span>
                   </div>
                   <Badge variant="indigo" size="sm" dot>
