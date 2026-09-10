@@ -13,6 +13,8 @@ import {
   CheckSquare,
   Plus,
   ListTodo,
+  KanbanSquare,
+  LayoutList,
 } from 'lucide-react';
 import Card, { CardHeader, CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -26,6 +28,7 @@ import TaskItem from '../components/tasks/TaskItem';
 import TaskModal from '../components/tasks/TaskModal';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
 import TaskFilters from '../components/tasks/TaskFilters';
+import KanbanBoard from '../components/kanban/KanbanBoard';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -58,13 +61,15 @@ export const ProjectDetailsPage = () => {
   const [memberToRemove, setMemberToRemove] = useState(null);
   const [isRemovingMember, setIsRemovingMember] = useState(false);
 
-  // Task filtering and metadata state
+  // Task filtering, view mode, and metadata state
+  const [viewMode, setViewMode] = useState('board'); // 'board' | 'list'
+  const [createDefaultStatus, setCreateDefaultStatus] = useState(TASK_STATUS.TODO);
   const [taskFilters, setTaskFilters] = useState({
     status: 'all',
     priority: 'all',
     assigneeId: 'all',
     search: '',
-    sortBy: 'created_at',
+    sortBy: 'position',
   });
   const [assignees, setAssignees] = useState([]);
   const [labels, setLabels] = useState([]);
@@ -82,6 +87,7 @@ export const ProjectDetailsPage = () => {
     createTask,
     updateTask,
     deleteTask,
+    moveTask,
   } = useTasks({ projectId, filters: taskFilters });
 
   // Load project details
@@ -230,6 +236,20 @@ export const ProjectDetailsPage = () => {
     } catch (err) {
       toast.error(err.message || 'Failed to update status');
     }
+  };
+
+  const handleMoveTask = async ({ taskId, destinationStatus, destinationPosition, affectedUpdates, optimisticTasks }) => {
+    try {
+      await moveTask({ taskId, destinationStatus, destinationPosition, affectedUpdates, optimisticTasks });
+    } catch (err) {
+      toast.error(err.message || 'Failed to move task. Please try again.');
+      throw err;
+    }
+  };
+
+  const handleOpenCreateTask = (status = TASK_STATUS.TODO) => {
+    setCreateDefaultStatus(status);
+    setShowCreateTaskModal(true);
   };
 
   // Task Status counts
@@ -500,75 +520,48 @@ export const ProjectDetailsPage = () => {
             </p>
           </div>
 
-          {canCreateTask && (
-            <Button
-              variant="primary"
-              size="sm"
-              icon={Plus}
-              onClick={() => setShowCreateTaskModal(true)}
-            >
-              New Task
-            </Button>
-          )}
-        </div>
+          <div className="flex items-center gap-2.5">
+            {/* View Switcher: Board vs List */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/60 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setViewMode('board')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  viewMode === 'board'
+                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+                title="Kanban Board View"
+              >
+                <KanbanSquare className="w-3.5 h-3.5" />
+                <span>Board</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  viewMode === 'list'
+                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+                title="List View"
+              >
+                <LayoutList className="w-3.5 h-3.5" />
+                <span>List</span>
+              </button>
+            </div>
 
-        {/* Status Filter Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto text-xs font-medium">
-          <button
-            type="button"
-            onClick={() => setTaskFilters((f) => ({ ...f, status: 'all' }))}
-            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-              taskFilters.status === 'all'
-                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            All Tasks ({statusCounts.all})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.TODO }))}
-            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-              taskFilters.status === TASK_STATUS.TODO
-                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            To Do ({statusCounts[TASK_STATUS.TODO]})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.IN_PROGRESS }))}
-            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-              taskFilters.status === TASK_STATUS.IN_PROGRESS
-                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            In Progress ({statusCounts[TASK_STATUS.IN_PROGRESS]})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.REVIEW }))}
-            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-              taskFilters.status === TASK_STATUS.REVIEW
-                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            Review ({statusCounts[TASK_STATUS.REVIEW]})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.DONE }))}
-            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-              taskFilters.status === TASK_STATUS.DONE
-                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            Done ({statusCounts[TASK_STATUS.DONE]})
-          </button>
+            {canCreateTask && (
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Plus}
+                onClick={() => handleOpenCreateTask(TASK_STATUS.TODO)}
+              >
+                New Task
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Filter controls row */}
@@ -580,7 +573,7 @@ export const ProjectDetailsPage = () => {
           />
         </div>
 
-        {/* Tasks List Content */}
+        {/* Tasks Views: Kanban Board or List */}
         {tasksLoading ? (
           <div className="py-16 flex flex-col items-center justify-center">
             <Spinner size="lg" />
@@ -590,50 +583,122 @@ export const ProjectDetailsPage = () => {
           <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 text-xs">
             {tasksError}
           </div>
-        ) : tasks.length === 0 ? (
-          <div className="p-8 sm:p-12 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/20">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3">
-              <CheckSquare className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
-              No tasks found
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
-              {taskFilters.search || taskFilters.status !== 'all' || taskFilters.priority !== 'all'
-                ? 'No tasks match your current filter criteria. Try resetting your filters.'
-                : 'Get started by creating your first task for this project.'}
-            </p>
-            {canCreateTask && (
-              <Button
-                variant="primary"
-                size="sm"
-                icon={Plus}
-                onClick={() => setShowCreateTaskModal(true)}
-              >
-                Create First Task
-              </Button>
-            )}
-          </div>
+        ) : viewMode === 'board' ? (
+          <KanbanBoard
+            tasks={tasks}
+            canDrag={!isWorkspaceViewer}
+            canAddTask={canCreateTask}
+            onTaskClick={(t) => setTaskToView(t)}
+            onAddTask={handleOpenCreateTask}
+            onMoveTask={handleMoveTask}
+          />
         ) : (
-          <div className="space-y-3">
-            {tasks.map((task) => {
-              const canEdit = !isWorkspaceViewer;
-              const canDelete = !isWorkspaceViewer;
+          <div className="space-y-4">
+            {/* Status Filter Tabs for List View */}
+            <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => setTaskFilters((f) => ({ ...f, status: 'all' }))}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                  taskFilters.status === 'all'
+                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                All Tasks ({statusCounts.all})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.TODO }))}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                  taskFilters.status === TASK_STATUS.TODO
+                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                To Do ({statusCounts[TASK_STATUS.TODO]})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.IN_PROGRESS }))}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                  taskFilters.status === TASK_STATUS.IN_PROGRESS
+                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                In Progress ({statusCounts[TASK_STATUS.IN_PROGRESS]})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.REVIEW }))}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                  taskFilters.status === TASK_STATUS.REVIEW
+                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                Review ({statusCounts[TASK_STATUS.REVIEW]})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.DONE }))}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                  taskFilters.status === TASK_STATUS.DONE
+                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                Done ({statusCounts[TASK_STATUS.DONE]})
+              </button>
+            </div>
 
-              return (
-                <TaskItem
-                  key={task.id}
-                  task={task}
-                  showProject={false}
-                  onView={(t) => setTaskToView(t)}
-                  onEdit={(t) => setTaskToEdit(t)}
-                  onDelete={(t) => handleDeleteTask(t.id)}
-                  onStatusChange={handleStatusChange}
-                  canEdit={canEdit}
-                  canDelete={canDelete}
-                />
-              );
-            })}
+            {tasks.length === 0 ? (
+              <div className="p-8 sm:p-12 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/20">
+                <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3">
+                  <CheckSquare className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
+                  No tasks found
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
+                  {taskFilters.search || taskFilters.status !== 'all' || taskFilters.priority !== 'all'
+                    ? 'No tasks match your current filter criteria. Try resetting your filters.'
+                    : 'Get started by creating your first task for this project.'}
+                </p>
+                {canCreateTask && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={Plus}
+                    onClick={() => handleOpenCreateTask(TASK_STATUS.TODO)}
+                  >
+                    Create First Task
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {tasks.map((task) => {
+                  const canEdit = !isWorkspaceViewer;
+                  const canDelete = !isWorkspaceViewer;
+
+                  return (
+                    <TaskItem
+                      key={task.id}
+                      task={task}
+                      showProject={false}
+                      onView={(t) => setTaskToView(t)}
+                      onEdit={(t) => setTaskToEdit(t)}
+                      onDelete={(t) => handleDeleteTask(t.id)}
+                      onStatusChange={handleStatusChange}
+                      canEdit={canEdit}
+                      canDelete={canDelete}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -715,6 +780,7 @@ export const ProjectDetailsPage = () => {
         onClose={() => setShowCreateTaskModal(false)}
         onSubmit={handleCreateTask}
         defaultProjectId={projectId}
+        defaultStatus={createDefaultStatus}
         assignees={assignees}
         labels={labels}
       />
