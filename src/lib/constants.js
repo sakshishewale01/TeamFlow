@@ -29,7 +29,7 @@ export const TASK_STATUS = {
 export const TASK_STATUS_LABELS = {
   [TASK_STATUS.TODO]: 'To Do',
   [TASK_STATUS.IN_PROGRESS]: 'In Progress',
-  [TASK_STATUS.REVIEW]: 'In Review',
+  [TASK_STATUS.REVIEW]: 'Review',
   [TASK_STATUS.DONE]: 'Done',
 }
 

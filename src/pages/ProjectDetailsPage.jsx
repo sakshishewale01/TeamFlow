@@ -15,6 +15,9 @@ import {
   ListTodo,
   KanbanSquare,
   LayoutList,
+  SearchX,
+  FilterX,
+  RotateCcw,
 } from 'lucide-react';
 import Card, { CardHeader, CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -40,6 +43,12 @@ import {
   TASK_STATUS,
   APP_ROUTES,
 } from '../utils/constants';
+import {
+  DEFAULT_TASK_FILTERS,
+  filterAndSortTasks,
+  computeStatusCounts,
+  getActiveFilterInfo,
+} from '../utils/taskFilters';
 
 export const ProjectDetailsPage = () => {
   const { projectId } = useParams();
@@ -64,13 +73,7 @@ export const ProjectDetailsPage = () => {
   // Task filtering, view mode, and metadata state
   const [viewMode, setViewMode] = useState('board'); // 'board' | 'list'
   const [createDefaultStatus, setCreateDefaultStatus] = useState(TASK_STATUS.TODO);
-  const [taskFilters, setTaskFilters] = useState({
-    status: 'all',
-    priority: 'all',
-    assigneeId: 'all',
-    search: '',
-    sortBy: 'position',
-  });
+  const [taskFilters, setTaskFilters] = useState(DEFAULT_TASK_FILTERS);
   const [assignees, setAssignees] = useState([]);
   const [labels, setLabels] = useState([]);
 
@@ -79,7 +82,7 @@ export const ProjectDetailsPage = () => {
   const [taskToEdit, setTaskToEdit] = useState(null);
   const [taskToView, setTaskToView] = useState(null);
 
-  // Hook for tasks in this project
+  // Hook for tasks in this project (fetched once and filtered locally)
   const {
     tasks,
     loading: tasksLoading,
@@ -88,7 +91,7 @@ export const ProjectDetailsPage = () => {
     updateTask,
     deleteTask,
     moveTask,
-  } = useTasks({ projectId, filters: taskFilters });
+  } = useTasks({ projectId });
 
   // Load project details
   useEffect(() => {
@@ -252,22 +255,26 @@ export const ProjectDetailsPage = () => {
     setShowCreateTaskModal(true);
   };
 
-  // Task Status counts
-  const statusCounts = useMemo(() => {
-    const counts = {
-      all: tasks.length,
-      [TASK_STATUS.TODO]: 0,
-      [TASK_STATUS.IN_PROGRESS]: 0,
-      [TASK_STATUS.REVIEW]: 0,
-      [TASK_STATUS.DONE]: 0,
-    };
-    tasks.forEach((t) => {
-      if (counts[t.status] !== undefined) {
-        counts[t.status] += 1;
-      }
-    });
-    return counts;
-  }, [tasks]);
+  // Unified in-memory filtering and sorting
+  const filteredTasks = useMemo(
+    () => filterAndSortTasks(tasks, taskFilters),
+    [tasks, taskFilters]
+  );
+
+  // Accurate status counts that do not collapse when selecting tabs
+  const statusCounts = useMemo(
+    () => computeStatusCounts(tasks, taskFilters),
+    [tasks, taskFilters]
+  );
+
+  const { hasActiveFilters } = useMemo(
+    () => getActiveFilterInfo(taskFilters, 'newest'),
+    [taskFilters]
+  );
+
+  const handleResetFilters = () => {
+    setTaskFilters(DEFAULT_TASK_FILTERS);
+  };
 
   if (loading) {
     return (
@@ -565,12 +572,28 @@ export const ProjectDetailsPage = () => {
         </div>
 
         {/* Filter controls row */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+        <div className="space-y-3">
           <TaskFilters
             filters={taskFilters}
             onChange={setTaskFilters}
             assignees={assignees}
+            labels={labels}
+            showProjectFilter={false}
+            defaultSort="newest"
           />
+
+          {/* Results summary */}
+          {!tasksLoading && !tasksError && tasks.length > 0 && (
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1">
+              <span>
+                Showing <strong className="text-slate-800 dark:text-slate-200">{filteredTasks.length}</strong>{' '}
+                {filteredTasks.length === 1 ? 'task' : 'tasks'}
+                {hasActiveFilters && tasks.length !== filteredTasks.length && (
+                  <span className="text-slate-400 dark:text-slate-500"> (filtered from {tasks.length})</span>
+                )}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Tasks Views: Kanban Board or List */}
@@ -585,7 +608,7 @@ export const ProjectDetailsPage = () => {
           </div>
         ) : viewMode === 'board' ? (
           <KanbanBoard
-            tasks={tasks}
+            tasks={filteredTasks}
             canDrag={!isWorkspaceViewer}
             canAddTask={canCreateTask}
             onTaskClick={(t) => setTaskToView(t)}
@@ -662,9 +685,7 @@ export const ProjectDetailsPage = () => {
                   No tasks found
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
-                  {taskFilters.search || taskFilters.status !== 'all' || taskFilters.priority !== 'all'
-                    ? 'No tasks match your current filter criteria. Try resetting your filters.'
-                    : 'Get started by creating your first task for this project.'}
+                  Get started by creating your first task for this project.
                 </p>
                 {canCreateTask && (
                   <Button
@@ -677,9 +698,31 @@ export const ProjectDetailsPage = () => {
                   </Button>
                 )}
               </div>
+            ) : filteredTasks.length === 0 ? (
+              <div className="p-8 sm:p-12 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/20">
+                <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3">
+                  {taskFilters.search ? <SearchX className="w-6 h-6" /> : <FilterX className="w-6 h-6" />}
+                </div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
+                  {taskFilters.search ? 'No tasks match your search' : 'No tasks match the selected filters'}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
+                  {taskFilters.search
+                    ? `No tasks found matching "${taskFilters.search}". Try searching for another term.`
+                    : 'Try adjusting or clearing your filter criteria to view tasks.'}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={RotateCcw}
+                  onClick={handleResetFilters}
+                >
+                  Reset Filters
+                </Button>
+              </div>
             ) : (
               <div className="space-y-3">
-                {tasks.map((task) => {
+                {filteredTasks.map((task) => {
                   const canEdit = !isWorkspaceViewer;
                   const canDelete = !isWorkspaceViewer;
 

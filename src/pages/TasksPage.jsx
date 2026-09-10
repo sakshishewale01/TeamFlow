@@ -6,6 +6,9 @@ import {
   FolderKanban,
   ListTodo,
   Layers,
+  SearchX,
+  FilterX,
+  RotateCcw,
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Spinner from '../components/ui/Spinner';
@@ -19,20 +22,18 @@ import { useTasks } from '../hooks/useTasks';
 import { useToast } from '../hooks/useToast';
 import { taskService } from '../services/taskService';
 import { TASK_STATUS, APP_ROUTES } from '../utils/constants';
+import {
+  DEFAULT_TASK_FILTERS,
+  filterAndSortTasks,
+  computeStatusCounts,
+  getActiveFilterInfo,
+} from '../utils/taskFilters';
 
 export const TasksPage = () => {
   const { activeWorkspace, isWorkspaceViewer } = useWorkspace();
   const toast = useToast();
 
-  const [taskFilters, setTaskFilters] = useState({
-    status: 'all',
-    priority: 'all',
-    assigneeId: 'all',
-    projectId: 'all',
-    search: '',
-    sortBy: 'created_at',
-  });
-
+  const [taskFilters, setTaskFilters] = useState(DEFAULT_TASK_FILTERS);
   const [assignees, setAssignees] = useState([]);
   const [labels, setLabels] = useState([]);
 
@@ -44,7 +45,7 @@ export const TasksPage = () => {
   // Fetch workspace projects for filter dropdown and task creation
   const { projects, loading: projectsLoading } = useProjects(activeWorkspace?.id);
 
-  // Fetch workspace tasks
+  // Fetch workspace tasks once
   const {
     tasks,
     loading: tasksLoading,
@@ -54,7 +55,6 @@ export const TasksPage = () => {
     deleteTask,
   } = useTasks({
     workspaceId: activeWorkspace?.id,
-    filters: taskFilters,
   });
 
   // Load assignees and labels for workspace
@@ -83,6 +83,23 @@ export const TasksPage = () => {
   }, [activeWorkspace?.id]);
 
   const canCreateTask = !isWorkspaceViewer;
+
+  // In-memory unified filtering and sorting
+  const filteredTasks = useMemo(
+    () => filterAndSortTasks(tasks, taskFilters),
+    [tasks, taskFilters]
+  );
+
+  // Accurate status counts that do not collapse when selecting tabs
+  const statusCounts = useMemo(
+    () => computeStatusCounts(tasks, taskFilters),
+    [tasks, taskFilters]
+  );
+
+  const { hasActiveFilters } = useMemo(
+    () => getActiveFilterInfo(taskFilters, 'newest'),
+    [taskFilters]
+  );
 
   const handleCreateTask = async (taskData) => {
     try {
@@ -129,22 +146,9 @@ export const TasksPage = () => {
     }
   };
 
-  // Status counters
-  const statusCounts = useMemo(() => {
-    const counts = {
-      all: tasks.length,
-      [TASK_STATUS.TODO]: 0,
-      [TASK_STATUS.IN_PROGRESS]: 0,
-      [TASK_STATUS.REVIEW]: 0,
-      [TASK_STATUS.DONE]: 0,
-    };
-    tasks.forEach((t) => {
-      if (counts[t.status] !== undefined) {
-        counts[t.status] += 1;
-      }
-    });
-    return counts;
-  }, [tasks]);
+  const handleResetFilters = () => {
+    setTaskFilters(DEFAULT_TASK_FILTERS);
+  };
 
   if (!activeWorkspace) {
     return (
@@ -257,17 +261,32 @@ export const TasksPage = () => {
       </div>
 
       {/* Filter Controls Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="space-y-3">
         <TaskFilters
           filters={taskFilters}
           onChange={setTaskFilters}
           projects={projects}
           showProjectFilter={true}
           assignees={assignees}
+          labels={labels}
+          defaultSort="newest"
         />
+
+        {/* Results Counter Summary */}
+        {!tasksLoading && !projectsLoading && !tasksError && projects.length > 0 && tasks.length > 0 && (
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1">
+            <span>
+              Showing <strong className="text-slate-800 dark:text-slate-200">{filteredTasks.length}</strong>{' '}
+              {filteredTasks.length === 1 ? 'task' : 'tasks'}
+              {hasActiveFilters && tasks.length !== filteredTasks.length && (
+                <span className="text-slate-400 dark:text-slate-500"> (filtered from {tasks.length})</span>
+              )}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Task List / States */}
+      {/* Task List / Refined Empty States */}
       {tasksLoading || projectsLoading ? (
         <div className="py-20 flex flex-col items-center justify-center">
           <Spinner size="lg" />
@@ -300,16 +319,10 @@ export const TasksPage = () => {
             <CheckSquare className="w-6 h-6" />
           </div>
           <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
-            No tasks found
+            No tasks yet
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
-            {taskFilters.search ||
-            taskFilters.status !== 'all' ||
-            taskFilters.priority !== 'all' ||
-            taskFilters.projectId !== 'all' ||
-            taskFilters.assigneeId !== 'all'
-              ? 'No tasks match your selected filter criteria. Try clearing or updating your filters.'
-              : 'No tasks have been created in this workspace yet.'}
+            Get started by creating your first task in this workspace.
           </p>
           {canCreateTask && (
             <Button
@@ -322,9 +335,32 @@ export const TasksPage = () => {
             </Button>
           )}
         </div>
+      ) : filteredTasks.length === 0 ? (
+        /* Differentiated No-Match States */
+        <div className="p-10 sm:p-14 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/20">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3">
+            {taskFilters.search ? <SearchX className="w-6 h-6" /> : <FilterX className="w-6 h-6" />}
+          </div>
+          <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
+            {taskFilters.search ? 'No tasks match your search' : 'No tasks match the selected filters'}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
+            {taskFilters.search
+              ? `No tasks found matching "${taskFilters.search}". Try checking for spelling or searching a different term.`
+              : 'Try broadening or clearing your filter criteria to view more tasks.'}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            icon={RotateCcw}
+            onClick={handleResetFilters}
+          >
+            Reset Filters
+          </Button>
+        </div>
       ) : (
         <div className="space-y-3">
-          {tasks.map((task) => {
+          {filteredTasks.map((task) => {
             const canEdit = !isWorkspaceViewer;
             const canDelete = !isWorkspaceViewer;
 
