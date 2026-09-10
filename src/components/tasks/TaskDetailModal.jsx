@@ -9,11 +9,18 @@ import {
   FolderKanban,
   Tag,
   AlertTriangle,
+  MessageSquare,
 } from 'lucide-react';
 import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
+import Spinner from '../ui/Spinner';
+import CommentItem from '../comments/CommentItem';
+import CommentComposer from '../comments/CommentComposer';
+import { useComments } from '../../hooks/useComments';
+import { useAuth } from '../../hooks/useAuth';
+import { useRole } from '../../hooks/useRole';
 import {
   TASK_STATUS_DETAILS,
   TASK_PRIORITY_DETAILS,
@@ -62,8 +69,22 @@ export const TaskDetailModal = ({
   canEdit = true,
   canDelete = true,
 }) => {
+  const { user, profile } = useAuth();
+  const { isAdmin, isManager, isViewer } = useRole();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const {
+    comments,
+    commentCount,
+    loading: commentsLoading,
+    error: commentsError,
+    isSubmitting: isSubmittingComment,
+    refreshComments,
+    createComment,
+    updateComment,
+    deleteComment,
+  } = useComments(isOpen && task ? task.id : null);
 
   if (!task) return null;
 
@@ -246,6 +267,76 @@ export const TaskDetailModal = ({
               </div>
             </div>
           )}
+
+          {/* Comments Section */}
+          <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  Comments
+                </h4>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                  {commentCount}
+                </span>
+              </div>
+            </div>
+
+            {/* Loading state */}
+            {commentsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Spinner size="md" />
+              </div>
+            ) : commentsError ? (
+              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 rounded-xl text-xs flex items-center justify-between mb-4 border border-rose-200 dark:border-rose-900/50">
+                <span>{commentsError}</span>
+                <button
+                  type="button"
+                  onClick={refreshComments}
+                  className="underline font-medium hover:text-rose-700 dark:hover:text-rose-300 ml-2 shrink-0 cursor-pointer"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Empty State */}
+                {comments.length === 0 ? (
+                  <div className="py-7 px-4 text-center rounded-xl bg-slate-50/60 dark:bg-slate-800/30 border border-dashed border-slate-200 dark:border-slate-800">
+                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
+                      No comments yet.
+                    </p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">
+                      Start the conversation about this task.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 divide-y divide-slate-100 dark:divide-slate-800/60 max-h-80 overflow-y-auto pr-1 -mr-1">
+                    {comments.map((c) => (
+                      <CommentItem
+                        key={c.id}
+                        comment={c}
+                        currentUserId={user?.id}
+                        isAdmin={isAdmin}
+                        isManager={isManager}
+                        isViewer={isViewer}
+                        onUpdate={updateComment}
+                        onDelete={deleteComment}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Composer */}
+                <CommentComposer
+                  currentUser={profile || user}
+                  onSubmit={createComment}
+                  isSubmitting={isSubmittingComment}
+                  canComment={!isViewer}
+                />
+              </div>
+            )}
+          </div>
 
           {/* Footer Actions */}
           <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">

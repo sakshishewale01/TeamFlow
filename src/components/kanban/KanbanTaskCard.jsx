@@ -1,5 +1,4 @@
-import React from 'react';
-import { Calendar, Clock, User } from 'lucide-react';
+import { Calendar, Clock, User, MessageSquare } from 'lucide-react';
 import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
 import {
@@ -109,22 +108,33 @@ export const KanbanTaskCard = ({
 
       {/* Footer: Due date + Assignee avatar */}
       <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-[11px]">
-        {/* Due Date */}
-        {formattedDueDate ? (
-          <div
-            className={`flex items-center gap-1 font-medium ${
-              overdue
-                ? 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-1.5 py-0.5 rounded-md'
-                : 'text-slate-400 dark:text-slate-500'
-            }`}
-            title={overdue ? 'Overdue' : 'Due date'}
-          >
-            {overdue ? <Clock className="w-3 h-3" /> : <Calendar className="w-3 h-3" />}
-            <span>{formattedDueDate}</span>
-          </div>
-        ) : (
-          <span />
-        )}
+        <div className="flex items-center gap-2">
+          {/* Due Date */}
+          {formattedDueDate && (
+            <div
+              className={`flex items-center gap-1 font-medium ${
+                overdue
+                  ? 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-1.5 py-0.5 rounded-md'
+                  : 'text-slate-400 dark:text-slate-500'
+              }`}
+              title={overdue ? 'Overdue' : 'Due date'}
+            >
+              {overdue ? <Clock className="w-3 h-3" /> : <Calendar className="w-3 h-3" />}
+              <span>{formattedDueDate}</span>
+            </div>
+          )}
+
+          {/* Comment Count */}
+          {Boolean(task.comment_count && task.comment_count > 0) && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 font-medium"
+              title={`${task.comment_count} comment${task.comment_count === 1 ? '' : 's'}`}
+            >
+              <MessageSquare className="w-3 h-3" />
+              {task.comment_count}
+            </span>
+          )}
+        </div>
 
         {/* Assignee */}
         <div className="flex items-center gap-1.5 shrink-0" title={assigneeName}>
