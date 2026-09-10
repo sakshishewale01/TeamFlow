@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { notificationService } from './notificationService';
 
 export const projectService = {
   async getProjects(workspaceId, filters = {}) {
@@ -204,6 +205,30 @@ export const projectService = {
     if (error) {
       console.error('Error adding project member:', error);
       throw error;
+    }
+
+    // Trigger notification to the added project member
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUserId = authData?.user?.id;
+
+      if (userId !== currentUserId) {
+        const { data: project } = await supabase
+          .from('projects')
+          .select('name')
+          .eq('id', projectId)
+          .single();
+
+        const projectName = project?.name || 'a project';
+        notificationService.createNotification({
+          userId,
+          type: 'project_member_added',
+          message: `You were added to project '${projectName}'.`,
+          actorId: currentUserId,
+        }).catch((err) => console.error('[projectService] member add notify error:', err));
+      }
+    } catch (notifyErr) {
+      console.error('[projectService] notification dispatch error:', notifyErr);
     }
 
     return data;

@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { notificationService } from './notificationService';
 
 const VALID_STATUSES = ['todo', 'in_progress', 'review', 'done'];
 const VALID_PRIORITIES = ['low', 'medium', 'high', 'urgent'];
@@ -250,7 +251,19 @@ export const taskService = {
       }
     }
 
-    return await this.getTask(newTask.id);
+    const createdTask = await this.getTask(newTask.id);
+
+    // Notify assignee if task was assigned to someone other than creator
+    if (assigneeId && assigneeId !== userId) {
+      notificationService.createNotification({
+        userId: assigneeId,
+        type: 'task_assigned',
+        message: `You were assigned to task '${title}'.`,
+        actorId: userId,
+      }).catch((err) => console.error('[taskService] assign notification error:', err));
+    }
+
+    return createdTask;
   },
 
   /**
@@ -306,6 +319,20 @@ export const taskService = {
       payload.position = updates.position;
     }
 
+    // If assignee or status might change, fetch existing task first to compare
+    let existingTask = null;
+    const isAssigneeChanging = updates.assigneeId !== undefined || updates.assignee_id !== undefined;
+    const isStatusChanging = updates.status !== undefined;
+
+    if (isAssigneeChanging || isStatusChanging) {
+      const { data: current } = await supabase
+        .from('tasks')
+        .select('id, title, status, assignee_id, created_by')
+        .eq('id', taskId)
+        .single();
+      existingTask = current;
+    }
+
     if (Object.keys(payload).length > 0) {
       const { error: updateError } = await supabase
         .from('tasks')
@@ -349,7 +376,52 @@ export const taskService = {
       }
     }
 
-    return await this.getTask(taskId);
+    const updatedTask = await this.getTask(taskId);
+
+    // Trigger notifications if applicable
+    if (existingTask) {
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUserId = authData?.user?.id;
+      const taskTitle = updatedTask.title || existingTask.title;
+
+      // 1. Assignee changed
+      const newAssigneeId = updatedTask.assignee_id;
+      const oldAssigneeId = existingTask.assignee_id;
+      if (isAssigneeChanging && newAssigneeId && newAssigneeId !== oldAssigneeId) {
+        notificationService.createNotification({
+          userId: newAssigneeId,
+          type: 'task_assigned',
+          message: `You were assigned to task '${taskTitle}'.`,
+          actorId: currentUserId,
+        }).catch((err) => console.error('[taskService] updateTask assign notify error:', err));
+      }
+
+      // 2. Status changed
+      if (isStatusChanging && updates.status !== existingTask.status) {
+        const statusLabel = updates.status.replace('_', ' ');
+        const notifyRecipients = new Set();
+
+        // Notify assignee if not current actor
+        if (newAssigneeId && newAssigneeId !== currentUserId) {
+          notifyRecipients.add(newAssigneeId);
+        }
+        // Notify task creator if not current actor
+        if (existingTask.created_by && existingTask.created_by !== currentUserId) {
+          notifyRecipients.add(existingTask.created_by);
+        }
+
+        notifyRecipients.forEach((recipientId) => {
+          notificationService.createNotification({
+            userId: recipientId,
+            type: 'task_status_changed',
+            message: `Task '${taskTitle}' was moved to ${statusLabel}.`,
+            actorId: currentUserId,
+          }).catch((err) => console.error('[taskService] updateTask status notify error:', err));
+        });
+      }
+    }
+
+    return updatedTask;
   },
 
   /**

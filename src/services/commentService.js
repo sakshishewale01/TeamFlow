@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { notificationService } from './notificationService';
 
 const COMMENT_SELECT = `
   id,
@@ -71,6 +72,40 @@ export const commentService = {
     if (error) {
       console.error('[commentService] createComment error:', error);
       throw new Error(error.message || 'Failed to add comment');
+    }
+
+    // Trigger notification to task participants (creator & assignee, excluding commenter)
+    try {
+      const { data: task } = await supabase
+        .from('tasks')
+        .select('id, title, created_by, assignee_id')
+        .eq('id', taskId)
+        .single();
+
+      if (task) {
+        const authorName = data?.user?.full_name || 'Someone';
+        const taskTitle = task.title || 'Task';
+        const message = `${authorName} commented on '${taskTitle}'.`;
+
+        const recipientIds = new Set();
+        if (task.created_by && task.created_by !== userId) {
+          recipientIds.add(task.created_by);
+        }
+        if (task.assignee_id && task.assignee_id !== userId) {
+          recipientIds.add(task.assignee_id);
+        }
+
+        recipientIds.forEach((recipientId) => {
+          notificationService.createNotification({
+            userId: recipientId,
+            type: 'comment_added',
+            message,
+            actorId: userId,
+          }).catch((err) => console.error('[commentService] notification error:', err));
+        });
+      }
+    } catch (notifyErr) {
+      console.error('[commentService] comment notification lookup error:', notifyErr);
     }
 
     return data;
