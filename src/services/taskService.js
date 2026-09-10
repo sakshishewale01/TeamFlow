@@ -365,6 +365,44 @@ export const taskService = {
   },
 
   /**
+   * Bulk update task positions and optional statuses in Supabase
+   * @param {Array<{ id: string, status?: string, position: number }>} updates
+   */
+  async updateTaskPositions(updates) {
+    if (!isSupabaseConfigured || !updates?.length) return [];
+
+    const promises = updates.map(({ id, status, position }) => {
+      const payload = { position };
+      if (status) payload.status = status;
+      return supabase.from('tasks').update(payload).eq('id', id);
+    });
+
+    const results = await Promise.all(promises);
+    const failed = results.find((r) => r.error);
+    if (failed?.error) {
+      console.error('[taskService] updateTaskPositions error:', failed.error);
+      throw failed.error;
+    }
+
+    return true;
+  },
+
+  /**
+   * Move a task to a new status and position, applying any shifted task positions atomically
+   */
+  async moveTask(taskId, destinationStatus, destinationPosition, affectedUpdates = []) {
+    if (!isSupabaseConfigured || !taskId) throw new Error('Task ID is required.');
+
+    const allUpdates = [
+      { id: taskId, status: destinationStatus, position: destinationPosition },
+      ...affectedUpdates,
+    ];
+
+    await this.updateTaskPositions(allUpdates);
+    return await this.getTask(taskId);
+  },
+
+  /**
    * Fetch eligible assignees for a workspace
    */
   async getWorkspaceAssignees(workspaceId) {

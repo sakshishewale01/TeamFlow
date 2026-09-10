@@ -123,14 +123,32 @@ export const useTasks = ({ projectId, workspaceId, filters = {} } = {}) => {
     [refreshTasks]
   );
 
+  const moveTask = useCallback(
+    async ({ taskId, destinationStatus, destinationPosition, affectedUpdates = [], optimisticTasks }) => {
+      const previousTasks = tasks;
+      if (optimisticTasks) {
+        setTasks(optimisticTasks);
+      }
+      try {
+        await taskService.moveTask(taskId, destinationStatus, destinationPosition, affectedUpdates);
+      } catch (err) {
+        setTasks(previousTasks);
+        throw err;
+      }
+    },
+    [tasks]
+  );
+
   return {
     tasks,
+    setTasks,
     loading,
     error,
     refreshTasks,
     createTask,
     updateTask,
     deleteTask,
+    moveTask,
   };
 };
 
