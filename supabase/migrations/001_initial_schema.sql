@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS public.workspaces (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   description TEXT,
-  owner_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  owner_id UUID NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
   CONSTRAINT fk_workspaces_owner_profile FOREIGN KEY (owner_id) REFERENCES public.profiles(id) ON DELETE CASCADE
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS public.workspaces (
 CREATE TABLE IF NOT EXISTS public.workspace_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
   role public.workspace_role NOT NULL DEFAULT 'member',
   joined_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
   CONSTRAINT unique_workspace_user UNIQUE (workspace_id, user_id),
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS public.projects (
   status public.project_status NOT NULL DEFAULT 'planning',
   start_date DATE,
   end_date DATE,
-  created_by UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_by UUID NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
   CONSTRAINT fk_projects_created_by_profile FOREIGN KEY (created_by) REFERENCES public.profiles(id) ON DELETE CASCADE
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS public.projects (
 CREATE TABLE IF NOT EXISTS public.project_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
   added_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
   CONSTRAINT unique_project_user UNIQUE (project_id, user_id),
   CONSTRAINT fk_project_members_profile FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE
@@ -116,9 +116,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   created_by UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   position INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
-  CONSTRAINT tasks_assignee_id_fkey FOREIGN KEY (assignee_id) REFERENCES public.profiles(id) ON DELETE SET NULL,
-  CONSTRAINT tasks_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id) ON DELETE CASCADE
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
 -- 3.7 COMMENTS (Attached to tasks)
@@ -128,8 +126,7 @@ CREATE TABLE IF NOT EXISTS public.comments (
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
-  CONSTRAINT comments_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
 -- 3.8 TASK_LABELS (Workspace-scoped tags)
