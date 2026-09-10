@@ -4,21 +4,14 @@ import { useAuth } from './useAuth';
 
 /**
  * Hook to manage tasks state for either a single project or an entire workspace.
- * Provides tasks list, loading/error states, and CRUD action handlers.
+ * Fetches the project/workspace tasks once and provides reactive actions.
  */
-export const useTasks = ({ projectId, workspaceId, filters = {} } = {}) => {
+export const useTasks = ({ projectId, workspaceId } = {}) => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  const statusFilter = filters.status || 'all';
-  const priorityFilter = filters.priority || 'all';
-  const assigneeFilter = filters.assigneeId || 'all';
-  const projectFilter = filters.projectId || 'all';
-  const searchQuery = filters.search || '';
-  const sortBy = filters.sortBy || 'created_at';
 
   const refreshTasks = useCallback(() => {
     setRefreshTrigger((prev) => prev + 1);
@@ -40,19 +33,10 @@ export const useTasks = ({ projectId, workspaceId, filters = {} } = {}) => {
         setError(null);
 
         let data = [];
-        const activeFilters = {
-          status: statusFilter,
-          priority: priorityFilter,
-          assigneeId: assigneeFilter,
-          projectId: projectFilter,
-          search: searchQuery,
-          sortBy,
-        };
-
         if (projectId) {
-          data = await taskService.getTasks(projectId, activeFilters);
+          data = await taskService.getTasks(projectId, { sortBy: 'position' });
         } else if (workspaceId) {
-          data = await taskService.getWorkspaceTasks(workspaceId, activeFilters);
+          data = await taskService.getWorkspaceTasks(workspaceId, { sortBy: 'created_at' });
         }
 
         if (!ignore) {
@@ -75,17 +59,7 @@ export const useTasks = ({ projectId, workspaceId, filters = {} } = {}) => {
     return () => {
       ignore = true;
     };
-  }, [
-    projectId,
-    workspaceId,
-    statusFilter,
-    priorityFilter,
-    assigneeFilter,
-    projectFilter,
-    searchQuery,
-    sortBy,
-    refreshTrigger,
-  ]);
+  }, [projectId, workspaceId, refreshTrigger]);
 
   const userId = user?.id;
 
