@@ -77,7 +77,9 @@ export function filterTasks(tasks = [], filters = {}) {
 
     // 6. Label Filter: Task must possess the selected label
     if (labelFilter !== 'all') {
-      const hasLabel = (task.labels || []).some((lbl) => lbl && lbl.id === labelFilter);
+      const hasLabel = (task.labels || []).some(
+        (lbl) => lbl && ((lbl.id && lbl.id === labelFilter) || (lbl.name && lbl.name === labelFilter))
+      );
       if (!hasLabel) {
         return false;
       }

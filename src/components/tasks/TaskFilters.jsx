@@ -125,21 +125,19 @@ export const TaskFilters = ({
       )}
 
       {/* Label filter */}
-      {labels.length > 0 && (
-        <select
-          value={filters.labelId || 'all'}
-          onChange={(e) => onChange({ ...filters, labelId: e.target.value })}
-          className={selectClass}
-          aria-label="Filter by label"
-        >
-          <option value="all">All Labels</option>
-          {labels.map((lbl) => (
-            <option key={lbl.id} value={lbl.id}>
-              {lbl.name}
-            </option>
-          ))}
-        </select>
-      )}
+      <select
+        value={filters.labelId || 'all'}
+        onChange={(e) => onChange({ ...filters, labelId: e.target.value })}
+        className={selectClass}
+        aria-label="Filter by label"
+      >
+        <option value="all">All Labels</option>
+        {labels.map((lbl) => (
+          <option key={lbl.id || lbl.name} value={lbl.id || lbl.name}>
+            {lbl.name}
+          </option>
+        ))}
+      </select>
 
       {/* Sort order filter */}
       <select

@@ -84,6 +84,30 @@ export const TasksPage = () => {
 
   const canCreateTask = !isWorkspaceViewer;
 
+  // Harmonized workspace labels from database and loaded tasks
+  const allWorkspaceLabels = useMemo(() => {
+    const map = new Map();
+    (labels || []).forEach((lbl) => {
+      if (lbl && (lbl.id || lbl.name)) {
+        const key = lbl.id || lbl.name;
+        map.set(key, { id: key, name: lbl.name, color: lbl.color });
+      }
+    });
+    (tasks || []).forEach((t) => {
+      (t.labels || []).forEach((lbl) => {
+        if (lbl && (lbl.id || lbl.name)) {
+          const key = lbl.id || lbl.name;
+          if (!map.has(key)) {
+            map.set(key, { id: key, name: lbl.name, color: lbl.color });
+          }
+        }
+      });
+    });
+    return Array.from(map.values()).sort((a, b) =>
+      (a.name || '').localeCompare(b.name || '')
+    );
+  }, [labels, tasks]);
+
   // In-memory unified filtering and sorting
   const filteredTasks = useMemo(
     () => filterAndSortTasks(tasks, taskFilters),
@@ -268,7 +292,7 @@ export const TasksPage = () => {
           projects={projects}
           showProjectFilter={true}
           assignees={assignees}
-          labels={labels}
+          labels={allWorkspaceLabels}
           defaultSort="newest"
         />
 

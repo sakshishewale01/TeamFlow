@@ -255,6 +255,30 @@ export const ProjectDetailsPage = () => {
     setShowCreateTaskModal(true);
   };
 
+  // Harmonized project labels from database and loaded tasks
+  const allProjectLabels = useMemo(() => {
+    const map = new Map();
+    (labels || []).forEach((lbl) => {
+      if (lbl && (lbl.id || lbl.name)) {
+        const key = lbl.id || lbl.name;
+        map.set(key, { id: key, name: lbl.name, color: lbl.color });
+      }
+    });
+    (tasks || []).forEach((t) => {
+      (t.labels || []).forEach((lbl) => {
+        if (lbl && (lbl.id || lbl.name)) {
+          const key = lbl.id || lbl.name;
+          if (!map.has(key)) {
+            map.set(key, { id: key, name: lbl.name, color: lbl.color });
+          }
+        }
+      });
+    });
+    return Array.from(map.values()).sort((a, b) =>
+      (a.name || '').localeCompare(b.name || '')
+    );
+  }, [labels, tasks]);
+
   // Unified in-memory filtering and sorting
   const filteredTasks = useMemo(
     () => filterAndSortTasks(tasks, taskFilters),
@@ -577,7 +601,7 @@ export const ProjectDetailsPage = () => {
             filters={taskFilters}
             onChange={setTaskFilters}
             assignees={assignees}
-            labels={labels}
+            labels={allProjectLabels}
             showProjectFilter={false}
             defaultSort="newest"
           />
