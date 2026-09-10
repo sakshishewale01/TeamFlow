@@ -1,242 +1,281 @@
-import { Link } from 'react-router-dom'
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  FolderKanban,
-  CheckSquare,
-  Users,
   Layers,
+  AlertCircle,
+  RotateCcw,
+  Sparkles,
+  FolderPlus,
   ArrowRight,
-  TrendingUp,
-} from 'lucide-react'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/common/Card'
-import { Button } from '@/components/common/Button'
-import { Badge } from '@/components/common/Badge'
+} from 'lucide-react';
+import Button from '../components/ui/Button';
+import { useDashboard } from '../hooks/useDashboard';
+import { useAuth } from '../hooks/useAuth';
+import { useRole } from '../hooks/useRole';
+import { projectService } from '../services/projectService';
+import { taskService } from '../services/taskService';
+import { APP_ROUTES } from '../utils/constants';
 
-export function DashboardPage() {
+import DashboardKPIs from '../components/dashboard/DashboardKPIs';
+import TaskStatusBreakdown from '../components/dashboard/TaskStatusBreakdown';
+import PriorityBreakdown from '../components/dashboard/PriorityBreakdown';
+import UpcomingDeadlines from '../components/dashboard/UpcomingDeadlines';
+import RecentActivity from '../components/dashboard/RecentActivity';
+import DashboardQuickActions from '../components/dashboard/DashboardQuickActions';
+import DashboardSkeleton from '../components/dashboard/DashboardSkeleton';
+
+import ProjectModal from '../components/projects/ProjectModal';
+import TaskModal from '../components/tasks/TaskModal';
+import TaskDetailModal from '../components/tasks/TaskDetailModal';
+
+export const DashboardPage = () => {
+  const { user, profile } = useAuth();
+  const { canCreateProjects, isViewer } = useRole();
+  const { data, loading, error, refresh, activeWorkspace } = useDashboard();
+
+  // Modals state
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [assignees, setAssignees] = useState([]);
+  const [labels, setLabels] = useState([]);
+
+  const userName = profile?.full_name || user?.email?.split('@')[0] || 'Team Member';
+  const canCreateTasks = !isViewer && (data.projects || []).length > 0;
+
+  // Preload assignees & labels for TaskModal when workspace changes
+  useEffect(() => {
+    let ignore = false;
+    async function loadWorkspaceMeta() {
+      if (!activeWorkspace?.id) return;
+      try {
+        const [assigneeList, labelList] = await Promise.all([
+          taskService.getWorkspaceAssignees(activeWorkspace.id),
+          taskService.getTaskLabels(activeWorkspace.id),
+        ]);
+        if (!ignore) {
+          setAssignees(assigneeList || []);
+          setLabels(labelList || []);
+        }
+      } catch (err) {
+        console.error('[DashboardPage] Error preloading meta:', err);
+      }
+    }
+    loadWorkspaceMeta();
+    return () => {
+      ignore = true;
+    };
+  }, [activeWorkspace?.id]);
+
+  const handleCreateProject = async (formData) => {
+    if (!activeWorkspace?.id || !user?.id) return;
+    await projectService.createProject(activeWorkspace.id, formData, user.id);
+    setShowProjectModal(false);
+    refresh();
+  };
+
+  const handleCreateTask = async (formData) => {
+    if (!user?.id) return;
+    await taskService.createTask({
+      ...formData,
+      created_by: user.id,
+    });
+    setShowTaskModal(false);
+    refresh();
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    await taskService.deleteTask(taskId);
+    setSelectedTask(null);
+    refresh();
+  };
+
+  // 1. Loading State
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <DashboardSkeleton />
+      </div>
+    );
+  }
+
+  // 2. Error State
+  if (error) {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center text-center p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-4">
+          <AlertCircle className="w-6 h-6" />
+        </div>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+          Unable to load dashboard data
+        </h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-md">
+          {error}
+        </p>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={refresh}
+          className="mt-5"
+        >
+          <RotateCcw className="w-4 h-4 mr-1.5" />
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  const hasZeroData = data.totalProjects === 0 && data.totalTasks === 0;
+
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Top Welcome Banner */}
-      <div className="relative overflow-hidden rounded-2xl p-6 sm:p-8 bg-linear-to-r from-blue-600 via-indigo-600 to-blue-700 text-white shadow-md">
-        <div className="relative z-10 max-w-2xl space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-xs text-xs font-semibold text-blue-100">
+    <div className="space-y-6">
+      {/* Top Welcome & Workspace Context Banner */}
+      <div className="relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-linear-to-r from-blue-600 via-indigo-600 to-purple-700 text-white shadow-lg shadow-indigo-500/10">
+        <div className="relative z-10 max-w-3xl space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-xs text-xs font-semibold text-blue-100 border border-white/15">
             <Layers className="w-3.5 h-3.5 text-blue-200" />
-            <span>Workspace Overview</span>
+            <span>{activeWorkspace?.name || 'Workspace'}</span>
+            <span className="w-1 h-1 rounded-full bg-blue-300" />
+            <span className="capitalize">{activeWorkspace?.userRole || 'Member'}</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            TeamFlow Dashboard
+
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            Welcome back, {userName}!
           </h1>
           <p className="text-sm sm:text-base text-blue-100/90 leading-relaxed">
-            Welcome to TeamFlow. Manage your team projects, prioritize tasks, and track real-time delivery milestones.
+            Live operational overview for{' '}
+            <strong className="text-white font-semibold">
+              {activeWorkspace?.name || 'your workspace'}
+            </strong>
+            . Track sprint delivery milestones, active workloads, and team discussions.
           </p>
 
-          <div className="pt-2 flex flex-wrap items-center gap-3">
-            <Link to="/projects">
-              <Button
-                variant="secondary"
-                size="sm"
-                className="bg-white text-blue-700 hover:bg-blue-50 border-0 font-semibold"
-              >
-                View Projects
-              </Button>
-            </Link>
-            <Link to="/tasks">
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-white border-white/30 hover:bg-white/10"
-              >
-                View Tasks
-              </Button>
-            </Link>
+          {/* Quick Actions Header Toolbar */}
+          <div className="pt-2">
+            <DashboardQuickActions
+              canCreateProjects={canCreateProjects}
+              canCreateTasks={canCreateTasks}
+              onNewProject={() => setShowProjectModal(true)}
+              onNewTask={() => setShowTaskModal(true)}
+            />
           </div>
         </div>
 
-        {/* Subtle decorative glow */}
-        <div className="absolute right-0 top-0 translate-x-1/4 -translate-y-1/4 w-72 h-72 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+        {/* Ambient decorative glow */}
+        <div className="absolute right-0 top-0 translate-x-1/4 -translate-y-1/4 w-80 h-80 rounded-full bg-white/10 blur-3xl pointer-events-none" />
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <Card>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                Active Projects
-              </p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
-                --
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Phase 4: Workspace Projects
-              </p>
-            </div>
-            <div className="p-3 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
-              <FolderKanban className="w-5 h-5" />
-            </div>
-          </CardContent>
-        </Card>
+      {/* Empty Workspace Experience */}
+      {hasZeroData ? (
+        <div className="p-8 sm:p-12 text-center rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 mx-auto flex items-center justify-center">
+            <Sparkles className="w-7 h-7" />
+          </div>
+          <div className="max-w-md mx-auto space-y-1.5">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+              Welcome to {activeWorkspace?.name || 'your workspace'}!
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+              No projects or tasks have been created yet. Get started by organizing your first project and assigning team deliverables.
+            </p>
+          </div>
 
-        <Card>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                Total Tasks
-              </p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
-                --
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Phase 5: Kanban Board
-              </p>
-            </div>
-            <div className="p-3 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
-              <CheckSquare className="w-5 h-5" />
-            </div>
-          </CardContent>
-        </Card>
+          <div className="pt-3 flex flex-wrap items-center justify-center gap-3">
+            {canCreateProjects ? (
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => setShowProjectModal(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-md shadow-indigo-500/20"
+              >
+                <FolderPlus className="w-4 h-4 mr-2" />
+                Create First Project
+              </Button>
+            ) : (
+              <Link to={APP_ROUTES.PROJECTS}>
+                <Button variant="primary" size="md">
+                  View Projects
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Section 1: KPI Cards & Completion Rate */}
+          <DashboardKPIs
+            totalProjects={data.totalProjects}
+            totalTasks={data.totalTasks}
+            completedTasks={data.completedTasks}
+            pendingTasks={data.pendingTasks}
+            completionRate={data.completionRate}
+          />
 
-        <Card>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                Team Members
-              </p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
-                --
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Workspace Collaborators
-              </p>
-            </div>
-            <div className="p-3 rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
-              <Users className="w-5 h-5" />
-            </div>
-          </CardContent>
-        </Card>
+          {/* Section 2: Two-column Status & Priority Breakdowns */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <TaskStatusBreakdown
+              statusCounts={data.statusCounts}
+              totalTasks={data.totalTasks}
+            />
+            <PriorityBreakdown
+              priorityCounts={data.priorityCounts}
+              totalTasks={data.totalTasks}
+            />
+          </div>
 
-        <Card>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                Sprint Velocity
-              </p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
-                --
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Realtime Analytics
-              </p>
-            </div>
-            <div className="p-3 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Section 3: Two-column Deadlines & Recent Activity */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <UpcomingDeadlines
+              upcomingTasks={data.upcomingTasks}
+              overdueTasks={data.overdueTasks}
+              totalOverdueCount={data.totalOverdueCount}
+              onTaskClick={(task) => setSelectedTask(task)}
+            />
+            <RecentActivity
+              recentTasks={data.recentTasks}
+              recentComments={data.recentComments}
+              onTaskClick={(task) => setSelectedTask(task)}
+            />
+          </div>
+        </>
+      )}
 
-      {/* Quick Launch & Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Quick Navigation</CardTitle>
-                <CardDescription>Core sections of your project workspace</CardDescription>
-              </div>
-              <Badge variant="primary">Foundation</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Link
-              to="/projects"
-              className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50 transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <FolderKanban className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    Projects Management
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Create, organize, and monitor workspace projects
-                  </p>
-                </div>
-              </div>
-              <ArrowRight className="w-4 h-4 text-slate-400" />
-            </Link>
+      {/* Modals */}
+      {showProjectModal && (
+        <ProjectModal
+          isOpen={showProjectModal}
+          onClose={() => setShowProjectModal(false)}
+          onSubmit={handleCreateProject}
+        />
+      )}
 
-            <Link
-              to="/tasks"
-              className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50 transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <CheckSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    Task Board
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Kanban status boards and workflow assignments
-                  </p>
-                </div>
-              </div>
-              <ArrowRight className="w-4 h-4 text-slate-400" />
-            </Link>
+      {showTaskModal && (
+        <TaskModal
+          isOpen={showTaskModal}
+          onClose={() => setShowTaskModal(false)}
+          onSubmit={handleCreateTask}
+          projects={data.projects || []}
+          showProjectSelect={true}
+          assignees={assignees}
+          labels={labels}
+        />
+      )}
 
-            <Link
-              to="/profile"
-              className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50 transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <Users className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    User Profile & Security
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Update personal profile, avatar, and credentials
-                  </p>
-                </div>
-              </div>
-              <ArrowRight className="w-4 h-4 text-slate-400" />
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Architecture Status</CardTitle>
-            <CardDescription>System layer readiness for upcoming development phases</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                Phase 0: Project Foundation
-              </span>
-              <Badge variant="success">Completed</Badge>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                Phase 1: Authentication & Profiles
-              </span>
-              <Badge variant="primary">Next</Badge>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                Phase 2: Workspaces & RBAC
-              </span>
-              <Badge variant="default">Scheduled</Badge>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                Phase 3: Projects & Kanban Tasks
-              </span>
-              <Badge variant="default">Scheduled</Badge>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {selectedTask && (
+        <TaskDetailModal
+          isOpen={Boolean(selectedTask)}
+          onClose={() => setSelectedTask(null)}
+          task={selectedTask}
+          onDelete={handleDeleteTask}
+          onEdit={() => {
+            setSelectedTask(null);
+            refresh();
+          }}
+        />
+      )}
     </div>
-  )
-}
+  );
+};
 
-export default DashboardPage
+export default DashboardPage;
