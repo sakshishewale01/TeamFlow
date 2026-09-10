@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import {
   Menu,
   Search,
-  Bell,
   User,
   LogOut,
   ChevronDown,
@@ -16,6 +15,7 @@ import { useWorkspace } from '../../hooks/useWorkspace';
 import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
 import ThemeToggle from '../ui/ThemeToggle';
+import { NotificationBell } from '../notifications/NotificationBell';
 import { APP_ROUTES } from '../../utils/constants';
 
 export const Header = ({ onOpenMobileMenu, onLogoutClick }) => {
@@ -78,16 +78,8 @@ export const Header = ({ onOpenMobileMenu, onLogoutClick }) => {
 
           <ThemeToggle />
 
-          {/* Notifications button placeholder */}
-          <button
-            type="button"
-            className="relative p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-            aria-label="Notifications"
-            title="Notifications (coming in next prompt)"
-          >
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-indigo-500 ring-2 ring-white dark:ring-slate-950" />
-          </button>
+          {/* Notifications Bell */}
+          <NotificationBell />
 
           <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-1" />
 
