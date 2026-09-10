@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   FolderKanban,
@@ -11,7 +11,8 @@ import {
   Clock,
   UserX,
   CheckSquare,
-  Sparkles,
+  Plus,
+  ListTodo,
 } from 'lucide-react';
 import Card, { CardHeader, CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -21,12 +22,19 @@ import Spinner from '../components/ui/Spinner';
 import Modal from '../components/ui/Modal';
 import ProjectModal from '../components/projects/ProjectModal';
 import AddProjectMemberModal from '../components/projects/AddProjectMemberModal';
+import TaskItem from '../components/tasks/TaskItem';
+import TaskModal from '../components/tasks/TaskModal';
+import TaskDetailModal from '../components/tasks/TaskDetailModal';
+import TaskFilters from '../components/tasks/TaskFilters';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
+import { useTasks } from '../hooks/useTasks';
 import { projectService } from '../services/projectService';
+import { taskService } from '../services/taskService';
 import {
   PROJECT_STATUS_DETAILS,
+  TASK_STATUS,
   APP_ROUTES,
 } from '../utils/constants';
 
@@ -42,7 +50,7 @@ export const ProjectDetailsPage = () => {
   const [error, setError] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Modals
+  // Modals for Project
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -50,6 +58,33 @@ export const ProjectDetailsPage = () => {
   const [memberToRemove, setMemberToRemove] = useState(null);
   const [isRemovingMember, setIsRemovingMember] = useState(false);
 
+  // Task filtering and metadata state
+  const [taskFilters, setTaskFilters] = useState({
+    status: 'all',
+    priority: 'all',
+    assigneeId: 'all',
+    search: '',
+    sortBy: 'created_at',
+  });
+  const [assignees, setAssignees] = useState([]);
+  const [labels, setLabels] = useState([]);
+
+  // Modals for Tasks
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
+  const [taskToEdit, setTaskToEdit] = useState(null);
+  const [taskToView, setTaskToView] = useState(null);
+
+  // Hook for tasks in this project
+  const {
+    tasks,
+    loading: tasksLoading,
+    error: tasksError,
+    createTask,
+    updateTask,
+    deleteTask,
+  } = useTasks({ projectId, filters: taskFilters });
+
+  // Load project details
   useEffect(() => {
     let ignore = false;
     async function loadDetails() {
@@ -80,6 +115,31 @@ export const ProjectDetailsPage = () => {
     };
   }, [projectId, refreshTrigger]);
 
+  // Load project assignees and task labels
+  useEffect(() => {
+    let ignore = false;
+    async function loadTaskMetadata() {
+      if (!projectId || !project?.workspace_id) return;
+      try {
+        const [assigneesList, labelsList] = await Promise.all([
+          taskService.getProjectTaskAssignees(projectId),
+          taskService.getTaskLabels(project.workspace_id),
+        ]);
+        if (!ignore) {
+          setAssignees(assigneesList);
+          setLabels(labelsList);
+        }
+      } catch (err) {
+        console.error('[ProjectDetailsPage] Error loading task metadata:', err);
+      }
+    }
+
+    loadTaskMetadata();
+    return () => {
+      ignore = true;
+    };
+  }, [projectId, project?.workspace_id]);
+
   const fetchProjectDetails = () => setRefreshTrigger((prev) => prev + 1);
 
   // Authorization matching canonical RLS
@@ -87,6 +147,7 @@ export const ProjectDetailsPage = () => {
   const canManageProject = !isWorkspaceViewer && (isWorkspaceAdmin || isWorkspaceManager || isCreator);
   const canDeleteProject = isWorkspaceAdmin; // RLS: Only Admins can delete projects
   const canAddMembers = !isWorkspaceViewer && (isWorkspaceAdmin || isWorkspaceManager);
+  const canCreateTask = !isWorkspaceViewer;
 
   const handleEditSubmit = async (data) => {
     try {
@@ -125,6 +186,68 @@ export const ProjectDetailsPage = () => {
       setIsRemovingMember(false);
     }
   };
+
+  // Task Handlers
+  const handleCreateTask = async (taskData) => {
+    try {
+      await createTask(taskData, projectId);
+      toast.success('Task created successfully.', 'Task Created');
+    } catch (err) {
+      toast.error(err.message || 'Failed to create task');
+      throw err;
+    }
+  };
+
+  const handleUpdateTask = async (taskData) => {
+    if (!taskToEdit?.id) return;
+    try {
+      await updateTask(taskToEdit.id, taskData);
+      toast.success('Task updated successfully.', 'Task Updated');
+      setTaskToEdit(null);
+    } catch (err) {
+      toast.error(err.message || 'Failed to update task');
+      throw err;
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    try {
+      await deleteTask(taskId);
+      toast.success('Task deleted.', 'Deleted');
+      if (taskToView?.id === taskId) {
+        setTaskToView(null);
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete task');
+      throw err;
+    }
+  };
+
+  const handleStatusChange = async (taskId, newStatus) => {
+    try {
+      await updateTask(taskId, { status: newStatus });
+      toast.success('Task status updated.');
+    } catch (err) {
+      toast.error(err.message || 'Failed to update status');
+    }
+  };
+
+  // Task Status counts
+  const statusCounts = useMemo(() => {
+    const counts = {
+      all: tasks.length,
+      [TASK_STATUS.TODO]: 0,
+      [TASK_STATUS.IN_PROGRESS]: 0,
+      [TASK_STATUS.REVIEW]: 0,
+      [TASK_STATUS.DONE]: 0,
+    };
+    tasks.forEach((t) => {
+      if (counts[t.status] !== undefined) {
+        counts[t.status] += 1;
+      }
+    });
+    return counts;
+  }, [tasks]);
 
   if (loading) {
     return (
@@ -320,7 +443,6 @@ export const ProjectDetailsPage = () => {
                 const isOwner = member.user_id === project.created_by;
                 const name = member.user?.full_name || member.user?.email || 'User';
                 const isCurrentUser = member.user_id === user?.id;
-                // Owner cannot be removed; managers/admins can remove other members; members can remove themselves (leave)
                 const canRemove = (canManageProject || isCurrentUser) && !isOwner;
 
                 return (
@@ -360,24 +482,161 @@ export const ProjectDetailsPage = () => {
         </CardContent>
       </Card>
 
-      {/* Planned Future Section: Tasks & Milestones */}
-      <Card className="border-dashed border-2 border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20">
-        <CardContent className="p-8 sm:p-12 text-center">
-          <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-4 shadow-xs">
-            <CheckSquare className="w-6 h-6" />
+      {/* Project Tasks Section */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <ListTodo className="w-5 h-5 text-indigo-600" />
+                <span>Project Tasks</span>
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                {tasks.length}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Manage deliverables, track progress, and assign team members for {project.name}.
+            </p>
           </div>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 text-xs font-semibold mb-2">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Coming in Phase 4</span>
+
+          {canCreateTask && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Plus}
+              onClick={() => setShowCreateTaskModal(true)}
+            >
+              New Task
+            </Button>
+          )}
+        </div>
+
+        {/* Status Filter Tabs */}
+        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto text-xs font-medium">
+          <button
+            type="button"
+            onClick={() => setTaskFilters((f) => ({ ...f, status: 'all' }))}
+            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+              taskFilters.status === 'all'
+                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            All Tasks ({statusCounts.all})
+          </button>
+          <button
+            type="button"
+            onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.TODO }))}
+            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+              taskFilters.status === TASK_STATUS.TODO
+                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            To Do ({statusCounts[TASK_STATUS.TODO]})
+          </button>
+          <button
+            type="button"
+            onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.IN_PROGRESS }))}
+            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+              taskFilters.status === TASK_STATUS.IN_PROGRESS
+                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            In Progress ({statusCounts[TASK_STATUS.IN_PROGRESS]})
+          </button>
+          <button
+            type="button"
+            onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.REVIEW }))}
+            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+              taskFilters.status === TASK_STATUS.REVIEW
+                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            Review ({statusCounts[TASK_STATUS.REVIEW]})
+          </button>
+          <button
+            type="button"
+            onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.DONE }))}
+            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+              taskFilters.status === TASK_STATUS.DONE
+                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            Done ({statusCounts[TASK_STATUS.DONE]})
+          </button>
+        </div>
+
+        {/* Filter controls row */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          <TaskFilters
+            filters={taskFilters}
+            onChange={setTaskFilters}
+            assignees={assignees}
+          />
+        </div>
+
+        {/* Tasks List Content */}
+        {tasksLoading ? (
+          <div className="py-16 flex flex-col items-center justify-center">
+            <Spinner size="lg" />
+            <p className="mt-3 text-xs text-slate-500">Loading tasks...</p>
           </div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
-            Tasks will appear here
-          </h3>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-            Task tracking, Kanban boards, and sprint milestones for &ldquo;{project.name}&rdquo; will be connected in the upcoming Tasks phase.
-          </p>
-        </CardContent>
-      </Card>
+        ) : tasksError ? (
+          <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 text-xs">
+            {tasksError}
+          </div>
+        ) : tasks.length === 0 ? (
+          <div className="p-8 sm:p-12 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/20">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3">
+              <CheckSquare className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
+              No tasks found
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
+              {taskFilters.search || taskFilters.status !== 'all' || taskFilters.priority !== 'all'
+                ? 'No tasks match your current filter criteria. Try resetting your filters.'
+                : 'Get started by creating your first task for this project.'}
+            </p>
+            {canCreateTask && (
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Plus}
+                onClick={() => setShowCreateTaskModal(true)}
+              >
+                Create First Task
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {tasks.map((task) => {
+              const canEdit = !isWorkspaceViewer;
+              const canDelete = !isWorkspaceViewer;
+
+              return (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  showProject={false}
+                  onView={(t) => setTaskToView(t)}
+                  onEdit={(t) => setTaskToEdit(t)}
+                  onDelete={(t) => handleDeleteTask(t.id)}
+                  onStatusChange={handleStatusChange}
+                  canEdit={canEdit}
+                  canDelete={canDelete}
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Edit Project Modal */}
       <ProjectModal
@@ -449,6 +708,42 @@ export const ProjectDetailsPage = () => {
           </Button>
         </div>
       </Modal>
+
+      {/* Create Task Modal */}
+      <TaskModal
+        isOpen={showCreateTaskModal}
+        onClose={() => setShowCreateTaskModal(false)}
+        onSubmit={handleCreateTask}
+        defaultProjectId={projectId}
+        assignees={assignees}
+        labels={labels}
+      />
+
+      {/* Edit Task Modal */}
+      <TaskModal
+        isOpen={Boolean(taskToEdit)}
+        onClose={() => setTaskToEdit(null)}
+        onSubmit={handleUpdateTask}
+        isEditing
+        initialData={taskToEdit}
+        defaultProjectId={projectId}
+        assignees={assignees}
+        labels={labels}
+      />
+
+      {/* Task Detail Modal */}
+      <TaskDetailModal
+        isOpen={Boolean(taskToView)}
+        onClose={() => setTaskToView(null)}
+        task={taskToView}
+        onEdit={(t) => {
+          setTaskToView(null);
+          setTaskToEdit(t);
+        }}
+        onDelete={handleDeleteTask}
+        canEdit={!isWorkspaceViewer}
+        canDelete={!isWorkspaceViewer}
+      />
     </div>
   );
 };

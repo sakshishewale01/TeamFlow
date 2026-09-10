@@ -1,96 +1,390 @@
-import { CheckSquare, Plus, Filter } from 'lucide-react'
-import { Card, CardContent } from '@/components/common/Card'
-import { Button } from '@/components/common/Button'
-import { Badge } from '@/components/common/Badge'
-import { EmptyState } from '@/components/common/EmptyState'
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  CheckSquare,
+  Plus,
+  FolderKanban,
+  ListTodo,
+  Layers,
+} from 'lucide-react';
+import Button from '../components/ui/Button';
+import Spinner from '../components/ui/Spinner';
+import TaskItem from '../components/tasks/TaskItem';
+import TaskModal from '../components/tasks/TaskModal';
+import TaskDetailModal from '../components/tasks/TaskDetailModal';
+import TaskFilters from '../components/tasks/TaskFilters';
+import { useWorkspace } from '../hooks/useWorkspace';
+import { useProjects } from '../hooks/useProjects';
+import { useTasks } from '../hooks/useTasks';
+import { useToast } from '../hooks/useToast';
+import { taskService } from '../services/taskService';
+import { TASK_STATUS, APP_ROUTES } from '../utils/constants';
 
-export function TasksPage() {
+export const TasksPage = () => {
+  const { activeWorkspace, isWorkspaceViewer } = useWorkspace();
+  const toast = useToast();
+
+  const [taskFilters, setTaskFilters] = useState({
+    status: 'all',
+    priority: 'all',
+    assigneeId: 'all',
+    projectId: 'all',
+    search: '',
+    sortBy: 'created_at',
+  });
+
+  const [assignees, setAssignees] = useState([]);
+  const [labels, setLabels] = useState([]);
+
+  // Modals state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [taskToEdit, setTaskToEdit] = useState(null);
+  const [taskToView, setTaskToView] = useState(null);
+
+  // Fetch workspace projects for filter dropdown and task creation
+  const { projects, loading: projectsLoading } = useProjects(activeWorkspace?.id);
+
+  // Fetch workspace tasks
+  const {
+    tasks,
+    loading: tasksLoading,
+    error: tasksError,
+    createTask,
+    updateTask,
+    deleteTask,
+  } = useTasks({
+    workspaceId: activeWorkspace?.id,
+    filters: taskFilters,
+  });
+
+  // Load assignees and labels for workspace
+  useEffect(() => {
+    let ignore = false;
+    async function loadWorkspaceMetadata() {
+      if (!activeWorkspace?.id) return;
+      try {
+        const [assigneesList, labelsList] = await Promise.all([
+          taskService.getWorkspaceAssignees(activeWorkspace.id),
+          taskService.getTaskLabels(activeWorkspace.id),
+        ]);
+        if (!ignore) {
+          setAssignees(assigneesList);
+          setLabels(labelsList);
+        }
+      } catch (err) {
+        console.error('[TasksPage] Error loading workspace metadata:', err);
+      }
+    }
+
+    loadWorkspaceMetadata();
+    return () => {
+      ignore = true;
+    };
+  }, [activeWorkspace?.id]);
+
+  const canCreateTask = !isWorkspaceViewer;
+
+  const handleCreateTask = async (taskData) => {
+    try {
+      await createTask(taskData, taskData.projectId);
+      toast.success('Task created successfully.', 'Task Created');
+      setShowCreateModal(false);
+    } catch (err) {
+      toast.error(err.message || 'Failed to create task');
+      throw err;
+    }
+  };
+
+  const handleUpdateTask = async (taskData) => {
+    if (!taskToEdit?.id) return;
+    try {
+      await updateTask(taskToEdit.id, taskData);
+      toast.success('Task updated successfully.', 'Task Updated');
+      setTaskToEdit(null);
+    } catch (err) {
+      toast.error(err.message || 'Failed to update task');
+      throw err;
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    try {
+      await deleteTask(taskId);
+      toast.success('Task deleted.', 'Deleted');
+      if (taskToView?.id === taskId) {
+        setTaskToView(null);
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete task');
+      throw err;
+    }
+  };
+
+  const handleStatusChange = async (taskId, newStatus) => {
+    try {
+      await updateTask(taskId, { status: newStatus });
+      toast.success('Task status updated.');
+    } catch (err) {
+      toast.error(err.message || 'Failed to update status');
+    }
+  };
+
+  // Status counters
+  const statusCounts = useMemo(() => {
+    const counts = {
+      all: tasks.length,
+      [TASK_STATUS.TODO]: 0,
+      [TASK_STATUS.IN_PROGRESS]: 0,
+      [TASK_STATUS.REVIEW]: 0,
+      [TASK_STATUS.DONE]: 0,
+    };
+    tasks.forEach((t) => {
+      if (counts[t.status] !== undefined) {
+        counts[t.status] += 1;
+      }
+    });
+    return counts;
+  }, [tasks]);
+
+  if (!activeWorkspace) {
+    return (
+      <div className="py-20 text-center">
+        <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3">
+          <Layers className="w-6 h-6" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">No Workspace Selected</h2>
+        <p className="text-xs text-slate-500 mt-1">Please select or create a workspace to view tasks.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fadeIn">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">
-              Tasks
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
+              <ListTodo className="w-6 h-6 text-indigo-600" />
+              <span>Tasks</span>
             </h1>
-            <Badge variant="primary">Foundation</Badge>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+              {activeWorkspace.name}
+            </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Track, assign, and organize team tasks across sprints and boards.
+            Track, assign, and organize deliverables across all projects in this workspace.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled
-            leftIcon={<Filter className="w-4 h-4" />}
-          >
-            Filter
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            disabled
-            leftIcon={<Plus className="w-4 h-4" />}
-          >
-            New Task
-          </Button>
+        {canCreateTask && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Plus}
+              onClick={() => {
+                if (projects.length === 0) {
+                  toast.error('You need at least one project before creating tasks.', 'No Projects');
+                  return;
+                }
+                setShowCreateModal(true);
+              }}
+            >
+              New Task
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Status Filter Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto text-xs font-medium">
+        <button
+          type="button"
+          onClick={() => setTaskFilters((f) => ({ ...f, status: 'all' }))}
+          className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+            taskFilters.status === 'all'
+              ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          All Tasks ({statusCounts.all})
+        </button>
+        <button
+          type="button"
+          onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.TODO }))}
+          className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+            taskFilters.status === TASK_STATUS.TODO
+              ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          To Do ({statusCounts[TASK_STATUS.TODO]})
+        </button>
+        <button
+          type="button"
+          onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.IN_PROGRESS }))}
+          className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+            taskFilters.status === TASK_STATUS.IN_PROGRESS
+              ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          In Progress ({statusCounts[TASK_STATUS.IN_PROGRESS]})
+        </button>
+        <button
+          type="button"
+          onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.REVIEW }))}
+          className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+            taskFilters.status === TASK_STATUS.REVIEW
+              ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          Review ({statusCounts[TASK_STATUS.REVIEW]})
+        </button>
+        <button
+          type="button"
+          onClick={() => setTaskFilters((f) => ({ ...f, status: TASK_STATUS.DONE }))}
+          className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+            taskFilters.status === TASK_STATUS.DONE
+              ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          Done ({statusCounts[TASK_STATUS.DONE]})
+        </button>
+      </div>
+
+      {/* Filter Controls Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <TaskFilters
+          filters={taskFilters}
+          onChange={setTaskFilters}
+          projects={projects}
+          showProjectFilter={true}
+          assignees={assignees}
+        />
+      </div>
+
+      {/* Task List / States */}
+      {tasksLoading || projectsLoading ? (
+        <div className="py-20 flex flex-col items-center justify-center">
+          <Spinner size="lg" />
+          <p className="mt-3 text-xs text-slate-500">Loading workspace tasks...</p>
         </div>
-      </div>
+      ) : tasksError ? (
+        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 text-xs">
+          {tasksError}
+        </div>
+      ) : projects.length === 0 ? (
+        <div className="p-10 sm:p-14 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/20">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3">
+            <FolderKanban className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
+            No projects in this workspace yet
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
+            Tasks belong to projects. Create your first project to start organizing tasks.
+          </p>
+          <Link to={APP_ROUTES.PROJECTS}>
+            <Button variant="primary" size="sm" icon={Plus}>
+              Create Project
+            </Button>
+          </Link>
+        </div>
+      ) : tasks.length === 0 ? (
+        <div className="p-10 sm:p-14 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/20">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3">
+            <CheckSquare className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
+            No tasks found
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
+            {taskFilters.search ||
+            taskFilters.status !== 'all' ||
+            taskFilters.priority !== 'all' ||
+            taskFilters.projectId !== 'all' ||
+            taskFilters.assigneeId !== 'all'
+              ? 'No tasks match your selected filter criteria. Try clearing or updating your filters.'
+              : 'No tasks have been created in this workspace yet.'}
+          </p>
+          {canCreateTask && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Plus}
+              onClick={() => setShowCreateModal(true)}
+            >
+              Create First Task
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {tasks.map((task) => {
+            const canEdit = !isWorkspaceViewer;
+            const canDelete = !isWorkspaceViewer;
 
-      {/* Task status filter tabs placeholder */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto text-xs font-medium text-slate-500 dark:text-slate-400">
-        <button
-          type="button"
-          className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-semibold"
-        >
-          All Tasks (0)
-        </button>
-        <button
-          type="button"
-          disabled
-          className="px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-not-allowed"
-        >
-          To Do
-        </button>
-        <button
-          type="button"
-          disabled
-          className="px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-not-allowed"
-        >
-          In Progress
-        </button>
-        <button
-          type="button"
-          disabled
-          className="px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-not-allowed"
-        >
-          Review
-        </button>
-        <button
-          type="button"
-          disabled
-          className="px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-not-allowed"
-        >
-          Done
-        </button>
-      </div>
+            return (
+              <TaskItem
+                key={task.id}
+                task={task}
+                showProject={true}
+                onView={(t) => setTaskToView(t)}
+                onEdit={(t) => setTaskToEdit(t)}
+                onDelete={(t) => handleDeleteTask(t.id)}
+                onStatusChange={handleStatusChange}
+                canEdit={canEdit}
+                canDelete={canDelete}
+              />
+            );
+          })}
+        </div>
+      )}
 
-      {/* Main Content Area: Empty State */}
-      <Card>
-        <CardContent className="py-12">
-          <EmptyState
-            icon={CheckSquare}
-            title="Task Management Ready"
-            description="The tasks foundation is in place. Interactive Kanban drag-and-drop boards, status filtering, and assignee management will be connected to Supabase in Phase 5."
-          />
-        </CardContent>
-      </Card>
+      {/* Create Task Modal */}
+      <TaskModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateTask}
+        projects={projects}
+        showProjectSelect={true}
+        defaultProjectId={taskFilters.projectId !== 'all' ? taskFilters.projectId : projects[0]?.id || ''}
+        assignees={assignees}
+        labels={labels}
+      />
+
+      {/* Edit Task Modal */}
+      <TaskModal
+        isOpen={Boolean(taskToEdit)}
+        onClose={() => setTaskToEdit(null)}
+        onSubmit={handleUpdateTask}
+        isEditing
+        initialData={taskToEdit}
+        projects={projects}
+        showProjectSelect={false}
+        assignees={assignees}
+        labels={labels}
+      />
+
+      {/* Task Detail Modal */}
+      <TaskDetailModal
+        isOpen={Boolean(taskToView)}
+        onClose={() => setTaskToView(null)}
+        task={taskToView}
+        onEdit={(t) => {
+          setTaskToView(null);
+          setTaskToEdit(t);
+        }}
+        onDelete={handleDeleteTask}
+        canEdit={!isWorkspaceViewer}
+        canDelete={!isWorkspaceViewer}
+      />
     </div>
-  )
-}
+  );
+};
 
-export default TasksPage
+export default TasksPage;
