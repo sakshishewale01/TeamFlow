@@ -21,7 +21,8 @@ const TASK_SELECT = `
   project:projects(id, name, workspace_id),
   task_label_links(
     label:task_labels(id, name, color)
-  )
+  ),
+  comments(count)
 `;
 
 function formatTask(task) {
@@ -30,9 +31,12 @@ function formatTask(task) {
     .map((link) => link?.label)
     .filter(Boolean);
 
+  const commentCount = task.comments?.[0]?.count ?? 0;
+
   return {
     ...task,
     labels,
+    comment_count: commentCount,
   };
 }
 
