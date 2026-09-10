@@ -8,6 +8,7 @@ import {
   Layers,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import WorkspaceSwitcher from '@/components/common/WorkspaceSwitcher'
 
 const navItems = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -61,6 +62,11 @@ export function Sidebar({ isOpen, onClose }) {
           >
             <X className="h-5 w-5" />
           </button>
+        </div>
+
+        {/* Workspace Switcher */}
+        <div className="border-b border-slate-100 dark:border-slate-800">
+          <WorkspaceSwitcher />
         </div>
 
         {/* Navigation Items */}
