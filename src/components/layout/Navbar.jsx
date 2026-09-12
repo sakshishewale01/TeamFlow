@@ -1,7 +1,8 @@
 import { useNavigate, Link } from 'react-router-dom'
-import { Menu, Search, Bell, LogOut } from 'lucide-react'
+import { Menu, Search, LogOut } from 'lucide-react'
 import { ThemeToggle } from '@/components/common/ThemeToggle'
 import { useAuth } from '@/hooks/useAuth'
+import { NotificationBell } from '@/components/notifications/NotificationBell'
 
 export function Navbar({ onMenuClick }) {
   const navigate = useNavigate()
@@ -54,16 +55,8 @@ export function Navbar({ onMenuClick }) {
 
       {/* Right side: Actions & User Profile */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Notifications placeholder */}
-        <button
-          type="button"
-          disabled
-          className="relative inline-flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-400 dark:border-slate-800 dark:bg-slate-900 cursor-not-allowed"
-          aria-label="Notifications"
-          title="Notifications will be available in later phases"
-        >
-          <Bell className="h-4 w-4" />
-        </button>
+        {/* Notifications Bell */}
+        <NotificationBell />
 
         {/* Theme Toggle */}
         <ThemeToggle />
