@@ -39,14 +39,22 @@ export const DashboardQuickActions = ({
 
       {/* Navigation shortcuts available to all roles */}
       <Link to={APP_ROUTES.PROJECTS}>
-        <Button variant="ghost" size="sm">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-white/90 hover:text-white hover:bg-white/15"
+        >
           <FolderKanban className="w-3.5 h-3.5 mr-1.5 text-blue-500" />
           View Projects
         </Button>
       </Link>
 
       <Link to={APP_ROUTES.TASKS}>
-        <Button variant="ghost" size="sm">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-white/90 hover:text-white hover:bg-white/15"
+        >
           <CheckSquare className="w-3.5 h-3.5 mr-1.5 text-indigo-500" />
           View Tasks
         </Button>

@@ -130,7 +130,7 @@ export const DashboardPage = () => {
   return (
     <div className="space-y-6">
       {/* Top Welcome & Workspace Context Banner */}
-      <div className="relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-linear-to-r from-blue-600 via-indigo-600 to-purple-700 text-white shadow-lg shadow-indigo-500/10">
+      <div className="relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 text-white shadow-lg shadow-indigo-500/10">
         <div className="relative z-10 max-w-3xl space-y-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-xs text-xs font-semibold text-blue-100 border border-white/15">
             <Layers className="w-3.5 h-3.5 text-blue-200" />

@@ -100,7 +100,7 @@ export const DashboardKPIs = ({
         {/* Visual Progress Bar */}
         <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
           <div
-            className="h-full bg-linear-to-r from-emerald-500 to-teal-400 transition-all duration-500 rounded-full"
+            className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 rounded-full"
             style={{ width: `${Math.min(100, Math.max(0, completionRate))}%` }}
           />
         </div>
