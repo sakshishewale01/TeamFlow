@@ -43,7 +43,7 @@ export const workspaceService = {
           id,
           user_id,
           role,
-          created_at,
+          joined_at,
           user:profiles!fk_workspace_members_profile(id, full_name, email, avatar_url)
         )
       `)
@@ -147,17 +147,20 @@ export const workspaceService = {
         workspace_id,
         user_id,
         role,
-        created_at,
+        joined_at,
         user:profiles!fk_workspace_members_profile(id, full_name, email, avatar_url)
       `)
       .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: true });
+      .order('joined_at', { ascending: true });
 
     if (error) {
       console.error('Error fetching workspace members:', error);
       throw error;
     }
 
-    return data || [];
+    return (data || []).map((member) => ({
+      ...member,
+      created_at: member.joined_at,
+    }));
   },
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Avatar from '../ui/Avatar';
@@ -25,6 +25,12 @@ export const AddProjectMemberModal = ({
 
   const toast = useToast();
 
+  const handleClose = () => {
+    setError(null);
+    setSelectedUserId('');
+    onClose();
+  };
+
   useEffect(() => {
     if (!isOpen || !workspaceId) return;
 
@@ -36,12 +42,6 @@ export const AddProjectMemberModal = ({
         const members = await workspaceService.getWorkspaceMembers(workspaceId);
         if (mounted) {
           setWorkspaceMembers(members);
-          const available = members.filter((m) => !existingMemberUserIds.includes(m.user_id));
-          if (available.length > 0) {
-            setSelectedUserId(available[0].user_id);
-          } else {
-            setSelectedUserId('');
-          }
         }
       } catch (err) {
         if (mounted) setError(err.message || 'Failed to load workspace members');
@@ -54,15 +54,31 @@ export const AddProjectMemberModal = ({
     return () => {
       mounted = false;
     };
-  }, [isOpen, workspaceId, existingMemberUserIds]);
+  }, [isOpen, workspaceId]);
 
-  const availableMembers = workspaceMembers.filter(
-    (m) => !existingMemberUserIds.includes(m.user_id)
+  const existingSet = useMemo(() => {
+    return new Set(
+      (existingMemberUserIds || []).filter(Boolean).map((id) => String(id).toLowerCase())
+    );
+  }, [existingMemberUserIds]);
+
+  const availableMembers = useMemo(() => {
+    return workspaceMembers.filter((m) => {
+      const uid = m.user_id || m.user?.id;
+      return uid && !existingSet.has(String(uid).toLowerCase());
+    });
+  }, [workspaceMembers, existingSet]);
+
+  const isSelectedAvailable = availableMembers.some(
+    (m) => String(m.user_id || m.user?.id).toLowerCase() === String(selectedUserId).toLowerCase()
   );
+  const activeSelectedUserId = isSelectedAvailable
+    ? selectedUserId
+    : (availableMembers[0]?.user_id || availableMembers[0]?.user?.id || '');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedUserId) {
+    if (!activeSelectedUserId) {
       setError('Please select a member to add');
       return;
     }
@@ -71,10 +87,10 @@ export const AddProjectMemberModal = ({
     setError(null);
 
     try {
-      const added = await projectService.addProjectMember(projectId, selectedUserId);
+      const added = await projectService.addProjectMember(projectId, activeSelectedUserId);
       toast.success('Member assigned to project.', 'Member Added');
       if (onMemberAdded) onMemberAdded(added);
-      onClose();
+      handleClose();
     } catch (err) {
       console.error('Error adding member to project:', err);
       setError(err.message || 'Failed to add member to project');
@@ -86,7 +102,7 @@ export const AddProjectMemberModal = ({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title="Add Project Member"
       description="Assign workspace teammates to this project."
       size="md"
@@ -95,6 +111,16 @@ export const AddProjectMemberModal = ({
         <div className="py-8 flex flex-col items-center justify-center">
           <Spinner size="lg" />
           <p className="mt-3 text-xs text-slate-500">Loading workspace members...</p>
+        </div>
+      ) : error && workspaceMembers.length === 0 ? (
+        <div className="py-6 text-center">
+          <p className="text-sm font-semibold text-rose-600 dark:text-rose-400 mb-1">
+            Failed to load workspace members
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">{error}</p>
+          <Button variant="outline" size="sm" onClick={handleClose}>
+            Close
+          </Button>
         </div>
       ) : availableMembers.length === 0 ? (
         <div className="py-6 text-center">
@@ -105,7 +131,7 @@ export const AddProjectMemberModal = ({
             Invite new members to your workspace first if you want to assign more teammates.
           </p>
           <div className="mt-5">
-            <Button variant="outline" size="sm" onClick={onClose}>
+            <Button variant="outline" size="sm" onClick={handleClose}>
               Close
             </Button>
           </div>
@@ -124,14 +150,15 @@ export const AddProjectMemberModal = ({
             </label>
             <div className="max-h-48 overflow-y-auto space-y-1.5 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
               {availableMembers.map((member) => {
-                const isSelected = selectedUserId === member.user_id;
+                const memberId = member.user_id || member.user?.id;
+                const isSelected = activeSelectedUserId === memberId;
                 const roleMeta = ROLE_DETAILS[member.role] || ROLE_DETAILS.member;
                 const name = member.user?.full_name || member.user?.email || 'User';
 
                 return (
                   <div
                     key={member.id}
-                    onClick={() => setSelectedUserId(member.user_id)}
+                    onClick={() => setSelectedUserId(memberId)}
                     className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition ${
                       isSelected
                         ? 'bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800'
@@ -163,7 +190,7 @@ export const AddProjectMemberModal = ({
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
+            <Button variant="ghost" onClick={handleClose} disabled={isSubmitting}>
               Cancel
             </Button>
             <Button type="submit" variant="primary" isLoading={isSubmitting}>

@@ -296,6 +296,11 @@ export const ProjectDetailsPage = () => {
     [taskFilters]
   );
 
+  const existingMemberIds = useMemo(
+    () => (project?.members || []).map((m) => m.user_id).filter(Boolean),
+    [project?.members]
+  );
+
   const handleResetFilters = () => {
     setTaskFilters(DEFAULT_TASK_FILTERS);
   };
@@ -328,7 +333,6 @@ export const ProjectDetailsPage = () => {
   }
 
   const statusMeta = PROJECT_STATUS_DETAILS[project.status] || PROJECT_STATUS_DETAILS.planning;
-  const existingMemberIds = (project.members || []).map((m) => m.user_id);
   const creatorName = project.creator?.full_name || project.creator?.email || 'Lead';
 
   const formattedStartDate = project.start_date
