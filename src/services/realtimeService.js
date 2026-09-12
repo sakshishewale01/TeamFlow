@@ -6,26 +6,66 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
  */
 export const realtimeService = {
   /**
+   * Helper to get a stable, shared channel name for task collaboration.
+   */
+  getTasksChannelName(projectId, workspaceId) {
+    if (projectId) return `realtime-tasks-project-${projectId}`;
+    if (workspaceId) return `realtime-tasks-workspace-${workspaceId}`;
+    return 'realtime-tasks-global';
+  },
+
+  /**
    * Subscribe to real-time changes on tasks.
-   * Can be scoped to a specific project (projectId) or workspace.
+   * Can be scoped to a specific project (projectId) or workspace (workspaceId).
+   * Supports both peer broadcast events (instant collaborative UI updates)
+   * and postgres_changes (database CDC WAL updates).
    *
    * @param {Object} options
    * @param {string} [options.projectId] - Optional project ID to filter changes
+   * @param {string} [options.workspaceId] - Optional workspace ID to filter changes
    * @param {Function} [options.onInsert] - Callback when a task is inserted
    * @param {Function} [options.onUpdate] - Callback when a task is updated
    * @param {Function} [options.onDelete] - Callback when a task is deleted
+   * @param {Function} [options.onMove] - Callback when a task is moved
    * @returns {Function} Unsubscribe cleanup function
    */
-  subscribeToTasks({ projectId, onInsert, onUpdate, onDelete } = {}) {
+  subscribeToTasks({ projectId, workspaceId, onInsert, onUpdate, onDelete, onMove } = {}) {
     if (!isSupabaseConfigured) {
       return () => {};
     }
 
-    const channelId = `realtime-tasks-${projectId || 'all'}-${Math.random().toString(36).substring(2, 9)}`;
+    const channelName = this.getTasksChannelName(projectId, workspaceId);
     const filter = projectId ? `project_id=eq.${projectId}` : undefined;
 
-    const channel = supabase
-      .channel(channelId)
+    const channel = supabase.channel(channelName);
+
+    // 1. Peer broadcast listeners
+    channel
+      .on('broadcast', { event: 'task:insert' }, ({ payload }) => {
+        if (onInsert && payload?.task) {
+          onInsert(payload.task);
+        }
+      })
+      .on('broadcast', { event: 'task:update' }, ({ payload }) => {
+        if (onUpdate && payload?.task) {
+          onUpdate(payload.task);
+        }
+      })
+      .on('broadcast', { event: 'task:delete' }, ({ payload }) => {
+        if (onDelete && (payload?.task || payload?.taskId)) {
+          onDelete(payload.task || { id: payload.taskId });
+        }
+      })
+      .on('broadcast', { event: 'task:move' }, ({ payload }) => {
+        if (onMove && payload) {
+          onMove(payload);
+        } else if (onUpdate && payload?.task) {
+          onUpdate(payload.task);
+        }
+      });
+
+    // 2. Postgres changes listeners (database CDC)
+    channel
       .on(
         'postgres_changes',
         {
@@ -81,6 +121,45 @@ export const realtimeService = {
         console.warn('[realtimeService] Error removing tasks channel:', err);
       }
     };
+  },
+
+  /**
+   * Broadcast a task event to project and workspace channels.
+   *
+   * @param {Object} options
+   * @param {string} [options.projectId] - Target project ID
+   * @param {string} [options.workspaceId] - Target workspace ID
+   * @param {string} options.event - Event name ('task:insert' | 'task:update' | 'task:delete' | 'task:move')
+   * @param {Object} options.payload - Event payload data
+   */
+  async broadcastTaskEvent({ projectId, workspaceId, event, payload }) {
+    if (!isSupabaseConfigured) return;
+
+    const channelsToNotify = new Set();
+    if (projectId) {
+      channelsToNotify.add(`realtime-tasks-project-${projectId}`);
+    }
+    if (workspaceId) {
+      channelsToNotify.add(`realtime-tasks-workspace-${workspaceId}`);
+    }
+    if (channelsToNotify.size === 0) {
+      channelsToNotify.add('realtime-tasks-global');
+    }
+
+    const promises = Array.from(channelsToNotify).map(async (chName) => {
+      try {
+        const channel = supabase.channel(chName);
+        await channel.send({
+          type: 'broadcast',
+          event,
+          payload,
+        });
+      } catch {
+        // Silently catch broadcast transport error
+      }
+    });
+
+    await Promise.allSettled(promises);
   },
 
   /**

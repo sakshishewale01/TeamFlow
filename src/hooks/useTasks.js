@@ -65,57 +65,81 @@ export const useTasks = ({ projectId, workspaceId } = {}) => {
 
     const unsubscribe = realtimeService.subscribeToTasks({
       projectId: projectId || undefined,
-      onInsert: async (newTaskRow) => {
-        if (ignore || !newTaskRow) return;
+      workspaceId: workspaceId || undefined,
+      onInsert: async (newTask) => {
+        if (ignore || !newTask) return;
 
         // Scope check for projectId
-        if (projectId && newTaskRow.project_id !== projectId) {
+        if (projectId && newTask.project_id && newTask.project_id !== projectId) {
           return;
         }
 
+        // If it's already an enriched full task (from broadcast)
+        if (newTask.project || newTask.labels || newTask.assignee || newTask.creator) {
+          if (workspaceId && newTask.project?.workspace_id && newTask.project.workspace_id !== workspaceId) {
+            return;
+          }
+
+          setTasks((prev) => {
+            if (prev.some((t) => t.id === newTask.id)) return prev;
+            return projectId ? [...prev, newTask] : [newTask, ...prev];
+          });
+          return;
+        }
+
+        // If it's a raw database row (from postgres_changes), fetch the full task
         try {
-          const fullTask = await taskService.getTask(newTaskRow.id);
+          const fullTask = await taskService.getTask(newTask.id);
           if (!ignore && fullTask) {
-            // If workspace-scoped, verify it belongs to this workspace
             if (workspaceId && fullTask.project?.workspace_id !== workspaceId) {
               return;
             }
 
             setTasks((prev) => {
-              if (prev.some((t) => t.id === fullTask.id)) {
-                return prev;
-              }
-              if (projectId) {
-                return [...prev, fullTask];
-              }
-              return [fullTask, ...prev];
+              if (prev.some((t) => t.id === fullTask.id)) return prev;
+              return projectId ? [...prev, fullTask] : [fullTask, ...prev];
             });
           }
         } catch (err) {
           console.error('[useTasks] Error handling realtime task insert:', err);
         }
       },
-      onUpdate: (updatedTaskRow) => {
-        if (ignore || !updatedTaskRow) return;
+      onUpdate: (updatedTask) => {
+        if (ignore || !updatedTask) return;
+
+        // If it's already an enriched full task (from broadcast)
+        if (updatedTask.project || updatedTask.labels || updatedTask.assignee || updatedTask.creator) {
+          setTasks((prev) => {
+            const exists = prev.some((t) => t.id === updatedTask.id);
+            if (!exists) {
+              if (projectId && updatedTask.project_id === projectId) {
+                return [...prev, updatedTask];
+              }
+              return prev;
+            }
+            return prev.map((t) => (t.id === updatedTask.id ? { ...t, ...updatedTask } : t));
+          });
+          return;
+        }
 
         // Immediate scalar update for instant UI responsiveness (Kanban status/position, title, etc.)
         setTasks((prev) => {
-          const exists = prev.some((t) => t.id === updatedTaskRow.id);
+          const exists = prev.some((t) => t.id === updatedTask.id);
           if (!exists) return prev;
 
           return prev.map((t) =>
-            t.id === updatedTaskRow.id
+            t.id === updatedTask.id
               ? {
                   ...t,
-                  ...updatedTaskRow,
+                  ...updatedTask,
                 }
               : t
           );
         });
 
-        // Background relation sync (e.g. assignee profile changes)
+        // Background relation sync for raw database row
         taskService
-          .getTask(updatedTaskRow.id)
+          .getTask(updatedTask.id)
           .then((fullTask) => {
             if (!ignore && fullTask) {
               setTasks((prev) =>
@@ -127,9 +151,39 @@ export const useTasks = ({ projectId, workspaceId } = {}) => {
             // Scalar update is already active, ignore relation sync error
           });
       },
-      onDelete: (deletedTaskRow) => {
-        if (ignore || !deletedTaskRow) return;
-        setTasks((prev) => prev.filter((t) => t.id !== deletedTaskRow.id));
+      onMove: ({ taskId, destinationStatus, destinationPosition, affectedUpdates = [], task }) => {
+        if (ignore || !taskId) return;
+
+        setTasks((prev) => {
+          const exists = prev.some((t) => t.id === taskId);
+          if (!exists) return prev;
+
+          return prev.map((t) => {
+            if (t.id === taskId) {
+              return {
+                ...t,
+                ...(task || {}),
+                status: destinationStatus,
+                position: destinationPosition,
+              };
+            }
+            const affected = affectedUpdates.find((u) => u.id === t.id);
+            if (affected) {
+              return {
+                ...t,
+                position: affected.position !== undefined ? affected.position : t.position,
+                status: affected.status || t.status,
+              };
+            }
+            return t;
+          });
+        });
+      },
+      onDelete: (deletedTask) => {
+        if (ignore || !deletedTask) return;
+        const targetId = deletedTask.id || deletedTask.taskId;
+        if (!targetId) return;
+        setTasks((prev) => prev.filter((t) => t.id !== targetId));
       },
     });
 
@@ -155,26 +209,56 @@ export const useTasks = ({ projectId, workspaceId } = {}) => {
 
       const created = await taskService.createTask(targetProjectId, userId, taskData);
       refreshTasks();
+
+      // Broadcast to project and workspace peers
+      realtimeService.broadcastTaskEvent({
+        projectId: targetProjectId,
+        workspaceId: created?.project?.workspace_id || workspaceId,
+        event: 'task:insert',
+        payload: { task: created },
+      });
+
       return created;
     },
-    [projectId, userId, refreshTasks]
+    [projectId, workspaceId, userId, refreshTasks]
   );
 
   const updateTask = useCallback(
     async (taskId, updates) => {
       const updated = await taskService.updateTask(taskId, updates);
       refreshTasks();
+
+      // Broadcast to project and workspace peers
+      realtimeService.broadcastTaskEvent({
+        projectId: updated?.project_id || projectId,
+        workspaceId: updated?.project?.workspace_id || workspaceId,
+        event: 'task:update',
+        payload: { task: updated },
+      });
+
       return updated;
     },
-    [refreshTasks]
+    [projectId, workspaceId, refreshTasks]
   );
 
   const deleteTask = useCallback(
     async (taskId) => {
+      const target = tasks.find((t) => t.id === taskId);
+      const targetProjectId = target?.project_id || projectId;
+      const targetWorkspaceId = target?.project?.workspace_id || workspaceId;
+
       await taskService.deleteTask(taskId);
       refreshTasks();
+
+      // Broadcast to project and workspace peers
+      realtimeService.broadcastTaskEvent({
+        projectId: targetProjectId,
+        workspaceId: targetWorkspaceId,
+        event: 'task:delete',
+        payload: { taskId },
+      });
     },
-    [refreshTasks]
+    [tasks, projectId, workspaceId, refreshTasks]
   );
 
   const moveTask = useCallback(
@@ -184,13 +268,27 @@ export const useTasks = ({ projectId, workspaceId } = {}) => {
         setTasks(optimisticTasks);
       }
       try {
-        await taskService.moveTask(taskId, destinationStatus, destinationPosition, affectedUpdates);
+        const moved = await taskService.moveTask(taskId, destinationStatus, destinationPosition, affectedUpdates);
+
+        // Broadcast move event to project and workspace peers
+        realtimeService.broadcastTaskEvent({
+          projectId: moved?.project_id || projectId,
+          workspaceId: moved?.project?.workspace_id || workspaceId,
+          event: 'task:move',
+          payload: {
+            taskId,
+            destinationStatus,
+            destinationPosition,
+            affectedUpdates,
+            task: moved,
+          },
+        });
       } catch (err) {
         setTasks(previousTasks);
         throw err;
       }
     },
-    [tasks]
+    [tasks, projectId, workspaceId]
   );
 
   return {
