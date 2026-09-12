@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { taskService } from '../services/taskService';
+import { realtimeService } from '../services/realtimeService';
 import { useAuth } from './useAuth';
 
 /**
@@ -56,10 +57,89 @@ export const useTasks = ({ projectId, workspaceId } = {}) => {
 
     fetchTasks();
 
+    if ((!projectId && !workspaceId) || !user?.id) {
+      return () => {
+        ignore = true;
+      };
+    }
+
+    const unsubscribe = realtimeService.subscribeToTasks({
+      projectId: projectId || undefined,
+      onInsert: async (newTaskRow) => {
+        if (ignore || !newTaskRow) return;
+
+        // Scope check for projectId
+        if (projectId && newTaskRow.project_id !== projectId) {
+          return;
+        }
+
+        try {
+          const fullTask = await taskService.getTask(newTaskRow.id);
+          if (!ignore && fullTask) {
+            // If workspace-scoped, verify it belongs to this workspace
+            if (workspaceId && fullTask.project?.workspace_id !== workspaceId) {
+              return;
+            }
+
+            setTasks((prev) => {
+              if (prev.some((t) => t.id === fullTask.id)) {
+                return prev;
+              }
+              if (projectId) {
+                return [...prev, fullTask];
+              }
+              return [fullTask, ...prev];
+            });
+          }
+        } catch (err) {
+          console.error('[useTasks] Error handling realtime task insert:', err);
+        }
+      },
+      onUpdate: (updatedTaskRow) => {
+        if (ignore || !updatedTaskRow) return;
+
+        // Immediate scalar update for instant UI responsiveness (Kanban status/position, title, etc.)
+        setTasks((prev) => {
+          const exists = prev.some((t) => t.id === updatedTaskRow.id);
+          if (!exists) return prev;
+
+          return prev.map((t) =>
+            t.id === updatedTaskRow.id
+              ? {
+                  ...t,
+                  ...updatedTaskRow,
+                }
+              : t
+          );
+        });
+
+        // Background relation sync (e.g. assignee profile changes)
+        taskService
+          .getTask(updatedTaskRow.id)
+          .then((fullTask) => {
+            if (!ignore && fullTask) {
+              setTasks((prev) =>
+                prev.map((t) => (t.id === fullTask.id ? fullTask : t))
+              );
+            }
+          })
+          .catch(() => {
+            // Scalar update is already active, ignore relation sync error
+          });
+      },
+      onDelete: (deletedTaskRow) => {
+        if (ignore || !deletedTaskRow) return;
+        setTasks((prev) => prev.filter((t) => t.id !== deletedTaskRow.id));
+      },
+    });
+
     return () => {
       ignore = true;
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
-  }, [projectId, workspaceId, refreshTrigger]);
+  }, [projectId, workspaceId, refreshTrigger, user?.id]);
 
   const userId = user?.id;
 

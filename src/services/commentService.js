@@ -35,6 +35,26 @@ export const commentService = {
   },
 
   /**
+   * Fetch a single comment by ID with user profile
+   */
+  async getComment(commentId) {
+    if (!isSupabaseConfigured || !commentId) return null;
+
+    const { data, error } = await supabase
+      .from('comments')
+      .select(COMMENT_SELECT)
+      .eq('id', commentId)
+      .single();
+
+    if (error) {
+      console.error('[commentService] getComment error:', error);
+      return null;
+    }
+
+    return data;
+  },
+
+  /**
    * Create a new comment on a task
    */
   async createComment(taskId, userId, content) {

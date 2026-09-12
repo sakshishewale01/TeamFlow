@@ -434,7 +434,7 @@ export const TasksPage = () => {
       <TaskDetailModal
         isOpen={Boolean(taskToView)}
         onClose={() => setTaskToView(null)}
-        task={taskToView}
+        task={tasks.find((t) => t.id === taskToView?.id) || taskToView}
         onEdit={(t) => {
           setTaskToView(null);
           setTaskToEdit(t);

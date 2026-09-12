@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { notificationService } from '../services/notificationService';
+import { realtimeService } from '../services/realtimeService';
 
 /**
  * Hook to manage user in-app notifications.
@@ -74,8 +75,55 @@ export function useNotifications() {
 
     loadData();
 
+    if (!userId) {
+      return () => {
+        ignore = true;
+      };
+    }
+
+    const unsubscribe = realtimeService.subscribeToNotifications({
+      userId,
+      onInsert: (newNotification) => {
+        if (ignore || !newNotification) return;
+        setNotifications((prev) => {
+          if (prev.some((n) => n.id === newNotification.id)) {
+            return prev;
+          }
+          return [newNotification, ...prev];
+        });
+        if (!newNotification.is_read) {
+          setUnreadCount((count) => count + 1);
+        }
+      },
+      onUpdate: (updatedNotification) => {
+        if (ignore || !updatedNotification) return;
+        setNotifications((prev) => {
+          const target = prev.find((n) => n.id === updatedNotification.id);
+          if (target && !target.is_read && updatedNotification.is_read) {
+            setUnreadCount((count) => Math.max(0, count - 1));
+          } else if (target && target.is_read && !updatedNotification.is_read) {
+            setUnreadCount((count) => count + 1);
+          }
+          return prev.map((n) =>
+            n.id === updatedNotification.id ? { ...n, ...updatedNotification } : n
+          );
+        });
+      },
+      onDelete: (deletedNotification) => {
+        if (ignore || !deletedNotification) return;
+        setNotifications((prev) => {
+          const target = prev.find((n) => n.id === deletedNotification.id);
+          if (target && !target.is_read) {
+            setUnreadCount((count) => Math.max(0, count - 1));
+          }
+          return prev.filter((n) => n.id !== deletedNotification.id);
+        });
+      },
+    });
+
     return () => {
       ignore = true;
+      unsubscribe();
     };
   }, [userId]);
 

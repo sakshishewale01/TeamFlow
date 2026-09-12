@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { authService } from '../services/authService';
 import { profileService } from '../services/profileService';
+import { realtimeService } from '../services/realtimeService';
 import { AuthContext } from './authContextDef';
 
 export const AuthProvider = ({ children }) => {
@@ -105,6 +106,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signOut = async () => {
+    await realtimeService.removeAllSubscriptions();
     await authService.signOut();
     setSession(null);
     setUser(null);

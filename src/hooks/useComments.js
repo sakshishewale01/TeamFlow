@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { commentService } from '../services/commentService';
+import { realtimeService } from '../services/realtimeService';
 import { useAuth } from './useAuth';
 
 export const useComments = (taskId) => {
@@ -33,7 +34,11 @@ export const useComments = (taskId) => {
     let ignore = false;
 
     async function load() {
-      if (!taskId) return;
+      if (!taskId) {
+        setComments([]);
+        setLoading(false);
+        return;
+      }
 
       try {
         setLoading(true);
@@ -55,10 +60,55 @@ export const useComments = (taskId) => {
 
     load();
 
+    if (!taskId || !user?.id) {
+      return () => {
+        ignore = true;
+      };
+    }
+
+    const unsubscribe = realtimeService.subscribeToComments({
+      taskId,
+      onInsert: async (newCommentRow) => {
+        if (ignore) return;
+        try {
+          const fullComment = await commentService.getComment(newCommentRow.id);
+          if (!ignore && fullComment) {
+            setComments((prev) => {
+              if (prev.some((c) => c.id === fullComment.id)) {
+                return prev;
+              }
+              return [...prev, fullComment];
+            });
+          }
+        } catch (err) {
+          console.error('[useComments] Error handling realtime comment insert:', err);
+        }
+      },
+      onUpdate: (updatedCommentRow) => {
+        if (ignore) return;
+        setComments((prev) =>
+          prev.map((c) =>
+            c.id === updatedCommentRow.id
+              ? {
+                  ...c,
+                  content: updatedCommentRow.content,
+                  updated_at: updatedCommentRow.updated_at,
+                }
+              : c
+          )
+        );
+      },
+      onDelete: (deletedCommentRow) => {
+        if (ignore) return;
+        setComments((prev) => prev.filter((c) => c.id !== deletedCommentRow.id));
+      },
+    });
+
     return () => {
       ignore = true;
+      unsubscribe();
     };
-  }, [taskId]);
+  }, [taskId, user?.id]);
 
   const createComment = useCallback(
     async (content) => {
