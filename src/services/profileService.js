@@ -44,14 +44,48 @@ export const profileService = {
     return data;
   },
 
-  async uploadAvatar(userId, file) {
+  extractPathFromUrl(avatarUrl) {
+    if (!avatarUrl || typeof avatarUrl !== 'string') return null;
+    const match = avatarUrl.match(/\/avatars\/(.+)$/);
+    return match ? decodeURIComponent(match[1]) : null;
+  },
+
+  async deleteAvatarFile(avatarUrl) {
+    if (!isSupabaseConfigured || !avatarUrl) return;
+    const filePath = this.extractPathFromUrl(avatarUrl);
+    if (!filePath) return;
+
+    try {
+      const { error } = await supabase.storage
+        .from('avatars')
+        .remove([filePath]);
+      if (error) {
+        console.warn('[profileService] Failed to remove avatar file from storage:', error);
+      }
+    } catch (err) {
+      console.warn('[profileService] deleteAvatarFile caught error:', err);
+    }
+  },
+
+  async updateProfileName(userId, fullName) {
+    if (!isSupabaseConfigured || !userId) {
+      throw new Error('Supabase is not configured or user ID is missing.');
+    }
+    const cleanName = (fullName || '').trim();
+    if (!cleanName) {
+      throw new Error('Full name cannot be empty.');
+    }
+    return await this.updateProfile(userId, { fullName: cleanName });
+  },
+
+  async uploadAvatar(userId, file, previousAvatarUrl = null) {
     if (!isSupabaseConfigured || !userId) {
       throw new Error('Supabase is not configured or user ID is missing.');
     }
 
     // Validate file type
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!validTypes.includes(file.type)) {
+    if (!file || !validTypes.includes(file.type)) {
       throw new Error('Invalid file type. Please upload a JPEG, PNG, WebP or GIF image.');
     }
 
@@ -72,14 +106,37 @@ export const profileService = {
 
     if (uploadError) {
       console.error('Error uploading avatar:', uploadError);
-      throw uploadError;
+      throw new Error(uploadError.message || 'Failed to upload avatar to storage.');
     }
 
     const { data: { publicUrl } } = supabase.storage
       .from('avatars')
       .getPublicUrl(filePath);
 
+    // Update profiles table with new avatar_url
+    await this.updateProfile(userId, { avatarUrl: publicUrl });
+
+    // Safely remove previous avatar from storage if it exists
+    if (previousAvatarUrl && previousAvatarUrl !== publicUrl) {
+      await this.deleteAvatarFile(previousAvatarUrl);
+    }
+
     return publicUrl;
+  },
+
+  async removeAvatar(userId, currentAvatarUrl = null) {
+    if (!isSupabaseConfigured || !userId) {
+      throw new Error('Supabase is not configured or user ID is missing.');
+    }
+
+    // 1. Clean up file in storage if URL is available
+    if (currentAvatarUrl) {
+      await this.deleteAvatarFile(currentAvatarUrl);
+    }
+
+    // 2. Clear avatar_url column in database
+    const updated = await this.updateProfile(userId, { avatarUrl: null });
+    return updated;
   },
 
   async createProfileIfMissing(userId, userEmail, fullName = '') {

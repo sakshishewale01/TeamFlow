@@ -6,6 +6,7 @@ import {
   Upload,
   Save,
   Info,
+  Trash2,
 } from 'lucide-react';
 import Card, { CardHeader, CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -13,6 +14,7 @@ import Input from '../components/ui/Input';
 import Avatar from '../components/ui/Avatar';
 import Badge from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
+import Modal from '../components/ui/Modal';
 import { useAuth } from '../hooks/useAuth';
 import { useRole } from '../hooks/useRole';
 import { useToast } from '../hooks/useToast';
@@ -31,6 +33,8 @@ export const ProfilePage = () => {
 
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isRemovingAvatar, setIsRemovingAvatar] = useState(false);
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
   const fileInputRef = useRef(null);
 
   const handleUpdateName = async (e) => {
@@ -45,12 +49,12 @@ export const ProfilePage = () => {
     setIsSavingName(true);
 
     try {
-      await profileService.updateProfile(user.id, { fullName });
+      await profileService.updateProfileName(user.id, fullName);
       await refreshProfile();
       toast.success('Your profile name has been updated.', 'Profile Saved');
     } catch (err) {
       console.error('Update name error:', err);
-      toast.error(err.message || 'Failed to update name. RLS may have blocked this operation.');
+      toast.error(err.message || 'Failed to update name. Please try again.');
     } finally {
       setIsSavingName(false);
     }
@@ -60,14 +64,17 @@ export const ProfilePage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Client-side quick check
-    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
-      toast.error('Please select a valid image file (JPEG, PNG, WebP).', 'Invalid File');
+    // Client-side quick check for supported formats
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please select a valid image file (JPG, PNG, or WebP).', 'Invalid File');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image must be smaller than 2MB.', 'File Too Large');
+      toast.error('Image size must be smaller than 2MB.', 'File Too Large');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -76,23 +83,39 @@ export const ProfilePage = () => {
     reader.onload = () => setAvatarPreview(reader.result);
     reader.readAsDataURL(file);
 
-    // Upload to Supabase Storage
+    // Upload to Supabase Storage with previous avatar cleanup
     setIsUploadingAvatar(true);
     try {
-      const publicUrl = await profileService.uploadAvatar(user.id, file);
-      // Save avatar_url to profile record
-      await profileService.updateProfile(user.id, { avatarUrl: publicUrl });
+      await profileService.uploadAvatar(user.id, file, profile?.avatar_url);
       await refreshProfile();
+      setAvatarPreview(null);
       toast.success('Profile avatar uploaded successfully!', 'Avatar Updated');
     } catch (err) {
       console.error('Avatar upload error:', err);
       toast.error(
-        err.message || 'Storage upload failed. Please ensure the avatars bucket is created.',
+        err.message || 'Storage upload failed. Please ensure the avatars bucket exists.',
         'Upload Failed'
       );
       setAvatarPreview(null);
     } finally {
       setIsUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setIsRemovingAvatar(true);
+    try {
+      await profileService.removeAvatar(user.id, profile?.avatar_url);
+      await refreshProfile();
+      setAvatarPreview(null);
+      setShowRemoveModal(false);
+      toast.success('Your profile avatar has been removed.', 'Avatar Removed');
+    } catch (err) {
+      console.error('Avatar remove error:', err);
+      toast.error(err.message || 'Failed to remove avatar. Please try again.', 'Removal Failed');
+    } finally {
+      setIsRemovingAvatar(false);
     }
   };
 
@@ -123,7 +146,7 @@ export const ProfilePage = () => {
             User Profile
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Manage your personal profile, role permissions, and authentication credentials.
+            Manage your personal profile, avatar photo, and workspace permissions.
           </p>
         </div>
 
@@ -145,7 +168,7 @@ export const ProfilePage = () => {
                 size="2xl"
                 className="ring-4 ring-indigo-500/10 dark:ring-indigo-500/20"
               />
-              {isUploadingAvatar && (
+              {(isUploadingAvatar || isRemovingAvatar) && (
                 <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center backdrop-blur-xs">
                   <Spinner size="md" color="text-white" />
                 </div>
@@ -165,8 +188,8 @@ export const ProfilePage = () => {
               </Badge>
             </div>
 
-            {/* Avatar Upload Trigger */}
-            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
+            {/* Avatar Upload / Replace / Remove Controls */}
+            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -181,12 +204,28 @@ export const ProfilePage = () => {
                 fullWidth
                 icon={Upload}
                 isLoading={isUploadingAvatar}
+                disabled={isUploadingAvatar || isRemovingAvatar}
                 onClick={() => fileInputRef.current?.click()}
               >
-                Change Avatar
+                {profile?.avatar_url ? 'Change Avatar' : 'Upload Avatar'}
               </Button>
-              <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
-                JPEG, PNG or WebP &bull; Max 2MB
+
+              {profile?.avatar_url && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  fullWidth
+                  icon={Trash2}
+                  className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                  disabled={isUploadingAvatar || isRemovingAvatar}
+                  onClick={() => setShowRemoveModal(true)}
+                >
+                  Remove Avatar
+                </Button>
+              )}
+
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                JPG, PNG or WebP &bull; Max 2MB
               </p>
             </div>
           </Card>
@@ -321,6 +360,34 @@ export const ProfilePage = () => {
           </Card>
         </div>
       </div>
+
+      {/* Remove Avatar Confirmation Modal */}
+      <Modal
+        isOpen={showRemoveModal}
+        onClose={() => !isRemovingAvatar && setShowRemoveModal(false)}
+        title="Remove Profile Avatar"
+        description="Are you sure you want to remove your profile photo? Your avatar will revert to the default letter initials."
+        size="sm"
+      >
+        <div className="flex items-center justify-end gap-3 mt-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={isRemovingAvatar}
+            onClick={() => setShowRemoveModal(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            isLoading={isRemovingAvatar}
+            onClick={handleRemoveAvatar}
+          >
+            Yes, Remove Avatar
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };
