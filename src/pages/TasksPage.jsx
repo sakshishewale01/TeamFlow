@@ -9,9 +9,11 @@ import {
   SearchX,
   FilterX,
   RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Spinner from '../components/ui/Spinner';
+import Modal from '../components/ui/Modal';
 import TaskItem from '../components/tasks/TaskItem';
 import TaskModal from '../components/tasks/TaskModal';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
@@ -41,6 +43,8 @@ export const TasksPage = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState(null);
   const [taskToView, setTaskToView] = useState(null);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [isDeletingTask, setIsDeletingTask] = useState(false);
 
   // Fetch workspace projects for filter dropdown and task creation
   const { projects, loading: projectsLoading } = useProjects(activeWorkspace?.id);
@@ -395,7 +399,7 @@ export const TasksPage = () => {
                 showProject={true}
                 onView={(t) => setTaskToView(t)}
                 onEdit={(t) => setTaskToEdit(t)}
-                onDelete={(t) => handleDeleteTask(t.id)}
+                onDelete={(t) => setTaskToDelete(t)}
                 onStatusChange={handleStatusChange}
                 canEdit={canEdit}
                 canDelete={canDelete}
@@ -443,6 +447,55 @@ export const TasksPage = () => {
         canEdit={!isWorkspaceViewer}
         canDelete={!isWorkspaceViewer}
       />
+
+      {/* Task Deletion Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(taskToDelete)}
+        onClose={() => !isDeletingTask && setTaskToDelete(null)}
+        title="Delete Task"
+        size="sm"
+      >
+        <div className="space-y-4 mt-2">
+          <div className="flex items-start gap-3 p-3 bg-rose-50 dark:bg-rose-950/40 rounded-xl text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-900/50">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-semibold mb-0.5">Are you sure you want to delete this task?</p>
+              <p className="text-xs text-rose-700 dark:text-rose-300">
+                "{taskToDelete?.title}" will be permanently removed. This action cannot be undone.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTaskToDelete(null)}
+              disabled={isDeletingTask}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={async () => {
+                if (!taskToDelete?.id) return;
+                setIsDeletingTask(true);
+                try {
+                  await handleDeleteTask(taskToDelete.id);
+                  setTaskToDelete(null);
+                } finally {
+                  setIsDeletingTask(false);
+                }
+              }}
+              isLoading={isDeletingTask}
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              Delete Permanently
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

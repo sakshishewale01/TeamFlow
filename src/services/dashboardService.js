@@ -49,7 +49,7 @@ export const dashboardService = {
       const totalTasks = tasks.length;
       const completedTasks = tasks.filter((t) => t.status === TASK_STATUS.DONE).length;
       const pendingTasks = totalTasks - completedTasks;
-      const completionRate = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+      const completionRate = totalTasks === 0 ? 0 : Math.min(100, Math.max(0, Math.round((completedTasks / totalTasks) * 100)));
 
       // 4. Status Breakdown
       const statusCounts = {

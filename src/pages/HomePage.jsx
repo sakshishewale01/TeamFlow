@@ -27,7 +27,7 @@ export function HomePage() {
   return (
     <div className="space-y-8">
       {/* Hero Welcome Banner */}
-      <div className="rounded-2xl bg-linear-to-r from-blue-600 via-indigo-600 to-blue-700 p-6 sm:p-8 text-white shadow-md">
+      <div className="rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 p-6 sm:p-8 text-white shadow-md">
         <div className="max-w-3xl space-y-3">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-blue-100 backdrop-blur-xs">
             <Sparkles className="h-3.5 w-3.5" />

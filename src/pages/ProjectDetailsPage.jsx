@@ -18,6 +18,7 @@ import {
   SearchX,
   FilterX,
   RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 import Card, { CardHeader, CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -81,6 +82,8 @@ export const ProjectDetailsPage = () => {
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState(null);
   const [taskToView, setTaskToView] = useState(null);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [isDeletingTask, setIsDeletingTask] = useState(false);
 
   // Hook for tasks in this project (fetched once and filtered locally)
   const {
@@ -374,7 +377,7 @@ export const ProjectDetailsPage = () => {
       <Card className="p-6 sm:p-8">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-linear-to-tr from-indigo-600 to-violet-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-indigo-600/20">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-indigo-600/20">
               <FolderKanban className="w-6 h-6" />
             </div>
 
@@ -761,7 +764,7 @@ export const ProjectDetailsPage = () => {
                       showProject={false}
                       onView={(t) => setTaskToView(t)}
                       onEdit={(t) => setTaskToEdit(t)}
-                      onDelete={(t) => handleDeleteTask(t.id)}
+                      onDelete={(t) => setTaskToDelete(t)}
                       onStatusChange={handleStatusChange}
                       canEdit={canEdit}
                       canDelete={canDelete}
@@ -881,6 +884,55 @@ export const ProjectDetailsPage = () => {
         canEdit={!isWorkspaceViewer}
         canDelete={!isWorkspaceViewer}
       />
+
+      {/* Task Deletion Confirmation Modal */}
+      <Modal
+        isOpen={Boolean(taskToDelete)}
+        onClose={() => !isDeletingTask && setTaskToDelete(null)}
+        title="Delete Task"
+        size="sm"
+      >
+        <div className="space-y-4 mt-2">
+          <div className="flex items-start gap-3 p-3 bg-rose-50 dark:bg-rose-950/40 rounded-xl text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-900/50">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-semibold mb-0.5">Are you sure you want to delete this task?</p>
+              <p className="text-xs text-rose-700 dark:text-rose-300">
+                "{taskToDelete?.title}" will be permanently removed. This action cannot be undone.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTaskToDelete(null)}
+              disabled={isDeletingTask}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={async () => {
+                if (!taskToDelete?.id) return;
+                setIsDeletingTask(true);
+                try {
+                  await handleDeleteTask(taskToDelete.id);
+                  setTaskToDelete(null);
+                } finally {
+                  setIsDeletingTask(false);
+                }
+              }}
+              isLoading={isDeletingTask}
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              Delete Permanently
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -177,8 +177,9 @@ export const TaskItem = ({
               <button
                 type="button"
                 onClick={() => onView(task)}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                 title="View task details"
+                aria-label={`View task details for ${task.title}`}
               >
                 <Eye className="w-4 h-4" />
               </button>
@@ -189,8 +190,9 @@ export const TaskItem = ({
               <button
                 type="button"
                 onClick={() => onEdit(task)}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                 title="Edit task"
+                aria-label={`Edit task ${task.title}`}
               >
                 <Edit3 className="w-4 h-4" />
               </button>
@@ -201,8 +203,9 @@ export const TaskItem = ({
               <button
                 type="button"
                 onClick={() => onDelete(task)}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                 title="Delete task"
+                aria-label={`Delete task ${task.title}`}
               >
                 <Trash2 className="w-4 h-4" />
               </button>

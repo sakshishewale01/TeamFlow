@@ -13,22 +13,35 @@ const WorkspaceModalForm = ({
   const [name, setName] = useState(isEditing && initialData ? initialData.name || '' : '');
   const [description, setDescription] = useState(isEditing && initialData ? initialData.description || '' : '');
   const [nameError, setNameError] = useState(null);
+  const [descError, setDescError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim()) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       setNameError('Workspace name is required');
+      return;
+    }
+    if (trimmedName.length > 100) {
+      setNameError('Workspace name must be 100 characters or fewer');
+      return;
+    }
+
+    const trimmedDesc = description.trim();
+    if (trimmedDesc.length > 500) {
+      setDescError('Description must be 500 characters or fewer');
       return;
     }
 
     setNameError(null);
+    setDescError(null);
     setIsSubmitting(true);
 
     try {
       await onSubmit({
-        name: name.trim(),
-        description: description.trim() || null,
+        name: trimmedName,
+        description: trimmedDesc || null,
       });
       onClose();
     } catch (err) {
@@ -51,20 +64,39 @@ const WorkspaceModalForm = ({
         error={nameError}
         icon={Briefcase}
         required
+        maxLength={100}
         autoFocus
       />
 
       <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-          Description (Optional)
-        </label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+            Description (Optional)
+          </label>
+          <span className="text-[11px] text-slate-400">
+            {description.length}/500
+          </span>
+        </div>
         <textarea
           rows={3}
           placeholder="What is this workspace focused on?"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="block w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm p-3 transition focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+          maxLength={500}
+          onChange={(e) => {
+            setDescription(e.target.value);
+            if (descError) setDescError(null);
+          }}
+          className={`block w-full rounded-xl border bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm p-3 transition focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${
+            descError
+              ? 'border-rose-300 dark:border-rose-800 focus:border-rose-500'
+              : 'border-slate-200 dark:border-slate-800 focus:border-indigo-500'
+          }`}
         />
+        {descError && (
+          <p className="mt-1 text-xs text-rose-600 dark:text-rose-400 font-medium">
+            {descError}
+          </p>
+        )}
       </div>
 
       <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
