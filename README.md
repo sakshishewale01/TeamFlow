@@ -192,32 +192,6 @@ In the project root, you can run:
 
 ---
 
-## 🗺 Roadmap
-
-- [x] Multi-tenant Workspace management & role delegation
-- [x] Project creation, filtering, and priority tracking
-- [x] Full Kanban Board with drag-and-drop workflow stages
-- [x] Task assignment, due date alerts, and priority badges
-- [x] Real-time task comments and discussions
-- [ ] Real-time updates via Supabase Realtime Channels / WebSockets
-- [ ] File attachments on task cards using Supabase Storage buckets
-- [ ] Email invitation notifications for workspace members
-- [ ] Activity logs and analytics dashboard
-
----
-
-## 🤝 Contributing
-
-Contributions make the open-source community an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m "feat: add some AmazingFeature"`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
 
 
 ---
