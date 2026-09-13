@@ -49,7 +49,7 @@ Designed with **Row Level Security (RLS)** at its foundation, TeamFlow ensures s
 - **Timeline & Deadlines**: Set target start dates, due dates, and monitor progress.
 
 ### 📋 Interactive Kanban Board & Tasks
-- **Workflow Columns**: Visualize tasks across stages: `Backlog`, `To Do`, `In Progress`, `In Review`, and `Done`.
+- **Workflow Columns**: Visualize tasks across stages: `To Do`, `In Progress`, `In Review`, and `Done`.
 - **Drag-and-Drop / Instant Reordering**: Smooth card interactions and real-time status transitions.
 - **Comprehensive Task Details**:
   - Assignees, priority badges, due dates, and rich text descriptions.
