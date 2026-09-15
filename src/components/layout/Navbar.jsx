@@ -1,12 +1,15 @@
+import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Menu, Search, LogOut } from 'lucide-react'
+import { Menu, Search, LogOut, X } from 'lucide-react'
 import { ThemeToggle } from '@/components/common/ThemeToggle'
 import { useAuth } from '@/hooks/useAuth'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
+import { GlobalSearch } from '@/components/search/GlobalSearch'
 
 export function Navbar({ onMenuClick }) {
   const navigate = useNavigate()
   const { user, profile, logout } = useAuth() || {}
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
 
   const displayName =
     profile?.full_name ||
@@ -30,8 +33,25 @@ export function Navbar({ onMenuClick }) {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/80 px-4 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80 sm:px-6">
-      {/* Left side: Mobile menu toggle & Quick search */}
-      <div className="flex items-center gap-3">
+      {/* Mobile search overlay */}
+      {isMobileSearchOpen && (
+        <div className="absolute inset-0 z-50 flex items-center gap-2 px-3 bg-white dark:bg-slate-900 sm:hidden">
+          <div className="flex-1 min-w-0">
+            <GlobalSearch isMobile onMobileClose={() => setIsMobileSearchOpen(false)} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsMobileSearchOpen(false)}
+            className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 cursor-pointer shrink-0"
+            aria-label="Close search"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      )}
+
+      {/* Left side: Mobile menu toggle, mobile search trigger & Desktop global search */}
+      <div className="flex items-center gap-2 sm:gap-3">
         <button
           type="button"
           onClick={onMenuClick}
@@ -41,15 +61,19 @@ export function Navbar({ onMenuClick }) {
           <Menu className="h-5 w-5" />
         </button>
 
-        {/* Global Search Placeholder */}
-        <div className="relative hidden sm:block w-64 md:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search projects, tasks..."
-            disabled
-            className="w-full rounded-lg border border-slate-200 bg-slate-50/80 pl-9 pr-3 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 cursor-not-allowed dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300"
-          />
+        {/* Mobile Search Toggle Button */}
+        <button
+          type="button"
+          onClick={() => setIsMobileSearchOpen(true)}
+          className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 sm:hidden cursor-pointer"
+          aria-label="Search projects, tasks..."
+        >
+          <Search className="h-5 w-5" />
+        </button>
+
+        {/* Global Search for Tablet & Desktop */}
+        <div className="hidden sm:block">
+          <GlobalSearch />
         </div>
       </div>
 

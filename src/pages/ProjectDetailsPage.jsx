@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   FolderKanban,
   Calendar,
@@ -58,6 +58,9 @@ export const ProjectDetailsPage = () => {
   const { isWorkspaceAdmin, isWorkspaceManager, isWorkspaceViewer } = useWorkspace();
   const toast = useToast();
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTaskId = searchParams.get('taskId');
+
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -95,6 +98,11 @@ export const ProjectDetailsPage = () => {
     deleteTask,
     moveTask,
   } = useTasks({ projectId });
+
+  // Active task for modal view (from direct state or URL deep-link)
+  const activeTaskToView =
+    taskToView ||
+    (urlTaskId && tasks?.length > 0 ? tasks.find((t) => t.id === urlTaskId) : null);
 
   // Load project details
   useEffect(() => {
@@ -873,9 +881,16 @@ export const ProjectDetailsPage = () => {
 
       {/* Task Detail Modal */}
       <TaskDetailModal
-        isOpen={Boolean(taskToView)}
-        onClose={() => setTaskToView(null)}
-        task={tasks.find((t) => t.id === taskToView?.id) || taskToView}
+        isOpen={Boolean(activeTaskToView)}
+        onClose={() => {
+          setTaskToView(null);
+          if (searchParams.get('taskId')) {
+            const nextParams = new URLSearchParams(searchParams);
+            nextParams.delete('taskId');
+            setSearchParams(nextParams, { replace: true });
+          }
+        }}
+        task={activeTaskToView}
         onEdit={(t) => {
           setTaskToView(null);
           setTaskToEdit(t);

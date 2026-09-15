@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   CheckSquare,
   Plus,
@@ -39,6 +39,9 @@ export const TasksPage = () => {
   const [assignees, setAssignees] = useState([]);
   const [labels, setLabels] = useState([]);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTaskId = searchParams.get('taskId');
+
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState(null);
@@ -60,6 +63,11 @@ export const TasksPage = () => {
   } = useTasks({
     workspaceId: activeWorkspace?.id,
   });
+
+  // Active task for modal view (from direct state or URL deep-link)
+  const activeTaskToView =
+    taskToView ||
+    (urlTaskId && tasks?.length > 0 ? tasks.find((t) => t.id === urlTaskId) : null);
 
   // Load assignees and labels for workspace
   useEffect(() => {
@@ -436,9 +444,16 @@ export const TasksPage = () => {
 
       {/* Task Detail Modal */}
       <TaskDetailModal
-        isOpen={Boolean(taskToView)}
-        onClose={() => setTaskToView(null)}
-        task={tasks.find((t) => t.id === taskToView?.id) || taskToView}
+        isOpen={Boolean(activeTaskToView)}
+        onClose={() => {
+          setTaskToView(null);
+          if (searchParams.get('taskId')) {
+            const nextParams = new URLSearchParams(searchParams);
+            nextParams.delete('taskId');
+            setSearchParams(nextParams, { replace: true });
+          }
+        }}
+        task={activeTaskToView}
         onEdit={(t) => {
           setTaskToView(null);
           setTaskToEdit(t);
