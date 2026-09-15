@@ -101,10 +101,10 @@ export function Sidebar({ isOpen, onClose }) {
         <div className="p-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
           <div className="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800/50">
             <p className="font-medium text-slate-700 dark:text-slate-300">
-              TeamFlow v0.1
+              TeamFlow v1.0
             </p>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Phase 0: Foundation Ready
+              Production Ready
             </p>
           </div>
         </div>

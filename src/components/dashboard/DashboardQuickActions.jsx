@@ -42,9 +42,9 @@ export const DashboardQuickActions = ({
         <Button
           variant="ghost"
           size="sm"
-          className="text-white/90 hover:text-white hover:bg-white/15"
+          className="!text-white/90 hover:!text-white hover:!bg-white/15 dark:!text-white/90 dark:hover:!text-white dark:hover:!bg-white/15"
         >
-          <FolderKanban className="w-3.5 h-3.5 mr-1.5 text-blue-500" />
+          <FolderKanban className="w-3.5 h-3.5 mr-1.5 text-white/90" />
           View Projects
         </Button>
       </Link>
@@ -53,9 +53,9 @@ export const DashboardQuickActions = ({
         <Button
           variant="ghost"
           size="sm"
-          className="text-white/90 hover:text-white hover:bg-white/15"
+          className="!text-white/90 hover:!text-white hover:!bg-white/15 dark:!text-white/90 dark:hover:!text-white dark:hover:!bg-white/15"
         >
-          <CheckSquare className="w-3.5 h-3.5 mr-1.5 text-indigo-500" />
+          <CheckSquare className="w-3.5 h-3.5 mr-1.5 text-white/90" />
           View Tasks
         </Button>
       </Link>
